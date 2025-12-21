@@ -180,13 +180,13 @@ fun AlphabetGameScreen(
                     val gap = if (isLandscape) 8.dp else 12.dp
 
                     // Dimensiuni responsive pentru cartonaș (îl limităm ca să nu înghită tot ecranul pe landscape).
-            val cardWidth = (maxWidth * if (isLandscape) 0.62f else 0.72f)
-                        .coerceIn(240.dp, 390.dp)
-            val cardHeight = (maxHeight * if (isLandscape) 0.62f else 0.48f)
-                        .coerceIn(160.dp, 260.dp)
+            val cardWidth = (maxWidth * if (isLandscape) 0.70f else 0.84f)
+                        .coerceIn(260.dp, 480.dp)
+            val cardHeight = (maxHeight * if (isLandscape) 0.66f else 0.54f)
+                        .coerceIn(190.dp, 320.dp)
 
-                    val mascotSize = if (isLandscape) 105.dp else 135.dp
-            val optionSize = if (isLandscape) 82.dp else 94.dp
+                    val mascotSize = if (isLandscape) 120.dp else 150.dp
+            val optionSize = if (isLandscape) 90.dp else 108.dp
 
                     // Rezervăm spațiu în dreapta jos, ca să nu se suprapună butonul Home peste conținut.
                     val rightSafePadding = 84.dp
@@ -260,14 +260,14 @@ fun AlphabetGameScreen(
                                             Image(
                                                 bitmap = centerBmp,
                                                 contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(0.92f),
+                                                modifier = Modifier.fillMaxSize(0.96f),
                                                 contentScale = ContentScale.Fit
                                             )
                                         } else {
                                             Image(
                                                 painter = painterResource(id = uiState.currentQuestion.imageRes),
                                                 contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(0.92f),
+                                                modifier = Modifier.fillMaxSize(0.96f),
                                                 contentScale = ContentScale.Fit
                                             )
                                         }
@@ -429,6 +429,7 @@ fun AlphabetGameScreen(
 }
 
 @Composable
+@Composable
 private fun HeaderBar(
     score: Int,
     stars: Int,
@@ -438,161 +439,157 @@ private fun HeaderBar(
     soundOn: Boolean,
     onToggleSound: () -> Unit
 ) {
-    val progress = if (totalQuestions > 0) (questionIndex + 1) / totalQuestions.toFloat() else 0f
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val rawProgress =
+        if (totalQuestions > 0) (questionIndex + 1) / totalQuestions.toFloat() else 0f
+    val progress by animateFloatAsState(
+        targetValue = rawProgress.coerceIn(0f, 1f),
+        label = "headerProgress"
+    )
+
+    val isLandscape =
+        LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val questionText = "Întrebarea ${questionIndex + 1} / $totalQuestions"
+    val percentText = "${(progress * 100).toInt()}%"
 
+    val centerHeight = if (isLandscape) 44.dp else 48.dp
+    val centerMaxWidth = if (isLandscape) 420.dp else 520.dp
 
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // Scor + stele
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color.White.copy(alpha = 0.92f),
+            shadowElevation = 4.dp
         ) {
-            // Scor + stele
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Image(
+                    painter = painterResource(id = AlphabetUi.Icons.star),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "$score",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFE65100)
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "★".repeat(stars.coerceAtMost(10)),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFF9800)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // BARĂ: progres + întrebarea (integrat în aceeași bară)
+        Surface(
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White.copy(alpha = 0.92f),
+            shadowElevation = 4.dp,
+            modifier = Modifier
+                .weight(1f)
+                .height(centerHeight)
+                .widthIn(max = centerMaxWidth)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color(0xFFECEFF1))
+            ) {
+                // progres umplut (mai vizibil decât LinearProgressIndicator pe înălțime mare)
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(Color(0xFFFF9800))
+                )
+
+                // text citibil peste progres
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp)
+                        .background(
+                            Color.White.copy(alpha = 0.35f),
+                            RoundedCornerShape(14.dp)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = questionText,
+                        fontSize = if (isLandscape) 15.sp else 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF263238),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = percentText,
+                        fontSize = if (isLandscape) 14.sp else 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF263238)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // Încercări + Sunet
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = Color.White.copy(alpha = 0.92f),
                 shadowElevation = 4.dp
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(id = AlphabetUi.Icons.star),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
+                    Text(
+                        text = "Șanse:",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF455A64)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    val hearts = "❤".repeat(attemptsLeft.coerceAtLeast(0))
                     Text(
-                        text = "$score",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFE65100)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "★".repeat(stars.coerceAtMost(10)),
+                        text = if (hearts.isEmpty()) "—" else hearts,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color(0xFFFF9800)
-                    )
-                }
-            }
-
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.92f),
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.widthIn(max = if (isLandscape) 240.dp else 320.dp)
-                ) {
-                    Text(
-                        text = questionText,
-                        fontSize = if (isLandscape) 15.sp else 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        color = Color(0xFFE53935)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.width(10.dp))
 
-            // Încercări + Sunet
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.92f),
-                    shadowElevation = 4.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Șanse:",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF455A64)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val hearts = "❤".repeat(attemptsLeft.coerceAtLeast(0))
-                        Text(
-                            text = if (hearts.isEmpty()) "—" else hearts,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFFE53935)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                SquishyButton(onClick = onToggleSound, size = 42.dp, shape = CircleShape) {
-                    Image(
-                        painter = painterResource(id = AlphabetUi.Icons.soundOn),
-                        contentDescription = "Sound",
-                        modifier = Modifier
-                            .size(24.dp)
-                            .alpha(if (soundOn) 1f else 0.45f)
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Progres
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.75f),
-            shadowElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Progres",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F)
-                    )
-                    Text(
-                        text = "${(progress * 100).toInt()}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = progress.coerceIn(0f, 1f),
+            SquishyButton(onClick = onToggleSound, size = 42.dp, shape = CircleShape) {
+                Image(
+                    painter = painterResource(id = AlphabetUi.Icons.soundOn),
+                    contentDescription = "Sound",
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(999.dp)),
-                    color = Color(0xFFFF9800),
-                    trackColor = Color(0xFFECEFF1)
+                        .size(24.dp)
+                        .alpha(if (soundOn) 1f else 0.45f)
                 )
             }
         }
