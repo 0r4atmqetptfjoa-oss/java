@@ -11,26 +11,23 @@ import androidx.navigation.compose.rememberNavController
 import com.example.educationalapp.alphabet.AlphabetGameScreen
 import com.example.educationalapp.alphabet.AlphabetMenuScreen
 import com.example.educationalapp.colors.ColorsGameScreen
-import com.example.educationalapp.features.games.* // Aici e GameRoutes
-import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
+import com.example.educationalapp.features.games.* import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
 import com.example.educationalapp.features.mainmenu.MainMenuScreen
-// SettingsScreen este în același pachet (com.example.educationalapp), deci nu are nevoie de import special
-// import com.example.educationalapp.features.settings.SettingsScreen <-- ACESTA ERA GREȘIT
-
 import com.example.educationalapp.features.songs.SongsMenuScreen
 import com.example.educationalapp.features.songs.SongPlayerScreen
 import com.example.educationalapp.features.sounds.*
+import com.example.educationalapp.features.settings.SettingsScreen
 import com.example.educationalapp.features.stories.StoriesMenuScreen
 import com.example.educationalapp.peekaboo.PeekABooGame
 import com.example.educationalapp.puzzle.PuzzleGameScreen
 import com.example.educationalapp.shapes.ShapesGameScreen
 
-// JOCURI NOI - IMPORTURI CORECTATE
+// JOCURI NOI
 import com.example.educationalapp.BalloonGame.BalloonGameScreen
 import com.example.educationalapp.MemoryGame.MemoryGameScreen
 import com.example.educationalapp.AnimalBandGame.AnimalBandGame
-import com.example.educationalapp.EggGame.EggGameScreen      // <-- DECOMENTAT
-import com.example.educationalapp.FeedGame.FeedGameScreen    // <-- DECOMENTAT
+import com.example.educationalapp.EggGame.EggGameScreen
+import com.example.educationalapp.FeedGame.FeedGameScreen
 
 /**
  * Helper: încearcă să se întoarcă la GamesMenu dacă există în backstack,
@@ -98,16 +95,16 @@ fun AppNavigation(viewModel: MainViewModel) {
             }
         }
 
+        /**
+         * Alphabet graph (MODIFICAT: Direct în joc)
+         * Am schimbat startDestination la ALPHABET_QUIZ și am scos meniul.
+         */
         navigation(
-            startDestination = GameRoutes.ALPHABET_MENU,
+            startDestination = GameRoutes.ALPHABET_QUIZ, // <-- Start direct cu jocul
             route = GameRoutes.ALPHABET_GRAPH
         ) {
-            composable(GameRoutes.ALPHABET_MENU) {
-                AlphabetMenuScreen(
-                    onPlayClick = { navController.navigate(GameRoutes.ALPHABET_QUIZ) },
-                    onBackToHome = { navController.popBackStack(Screen.MainMenu.route, false) }
-                )
-            }
+            // Am eliminat composable(GameRoutes.ALPHABET_MENU)
+
             composable(GameRoutes.ALPHABET_QUIZ) {
                 AlphabetGameScreen(
                     onBackToMenu = { navController.popBackStack() }
@@ -157,8 +154,6 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.SEQUENCE) { wrap(GameRoutes.SEQUENCE) { SequenceMemoryGameScreen(navController, starState) }() }
         composable(GameRoutes.MATH) { wrap(GameRoutes.MATH) { MathGameScreen(navController, starState) }() }
 
-        // --- AICI ERAU ERORILE DE "UNRESOLVED REFERENCE" ---
-        // Acum sunt rezolvate prin importurile de sus
         composable(GameRoutes.EGG_SURPRISE) { wrap(GameRoutes.EGG_SURPRISE) { EggGameScreen(onHome = { backToGames(navController) }) }() }
         composable(GameRoutes.FEED_MONSTER) { wrap(GameRoutes.FEED_MONSTER) { FeedGameScreen(onHome = { backToGames(navController) }) }() }
 
