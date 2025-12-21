@@ -224,12 +224,11 @@ fun AlphabetGameScreen(
                             else -> AlphabetUi.Mascot.normal
                         }
 
-                        // =============================================================
-                        // LANDSCAPE: regiuni clare (ca în schema ta):
-                        // - SUS (header): stele + progres/întrebare + șanse + sound + home
-                        // - STÂNGA: card animal/obiect
-                        // - DREAPTA SUS: cuvânt cu literă lipsă
-                        // - DREAPTA JOS: butoane litere + mascota în dreapta
+                                                // =============================================================
+                        // LANDSCAPE: layout fix (totul vizibil pe ecran)
+                        // - STÂNGA: card mare cu animal/obiect (prioritar)
+                        // - DREAPTA SUS: cuvântul cu literă lipsă
+                        // - DREAPTA JOS: litere mari + mascotă lângă litere, lipită de "pământ"
                         // =============================================================
                         Row(
                             modifier = Modifier
@@ -239,17 +238,21 @@ fun AlphabetGameScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
 
-                            // --- CARD (galben) ---
+                            // --- CARD (principal) ---
                             Box(
                                 modifier = Modifier
-                                    .weight(0.62f)
+                                    .weight(0.68f)
                                     .fillMaxHeight(),
                                 contentAlignment = Alignment.Center
                             ) {
+                                // lăsăm card-ul să fie mare, dar controlat (fără să iasă din ecran)
+                                val w = minOf(cardWidth, maxWidth * 0.70f)
+                                val h = minOf(cardHeight, maxHeight * 0.85f)
+
                                 Box(
                                     modifier = Modifier
-                                        .width(cardWidth)
-                                        .height(cardHeight)
+                                        .width(w)
+                                        .height(h)
                                         .scale(cardScale)
                                         .graphicsLayer { translationX = shakeX.value }
                                         .shadow(12.dp, RoundedCornerShape(22.dp))
@@ -257,81 +260,128 @@ fun AlphabetGameScreen(
                                         .border(BorderStroke(4.dp, borderColor), RoundedCornerShape(22.dp))
                                         .padding(7.dp)
                                 ) {
-                                    val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 900)
-                                    if (centerBmp != null) {
-                                        Image(
-                                            bitmap = centerBmp,
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(0.96f),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    } else {
-                                        Image(
-                                            painter = painterResource(id = uiState.currentQuestion.imageRes),
-                                            contentDescription = null,
-                                            modifier = Modifier.fillMaxSize(0.96f),
-                                            contentScale = ContentScale.Fit
-                                        )
+                                    val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 1100)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    listOf(
+                                                        Color(0xFFE3F2FD),
+                                                        Color(0xFFF1F8E9)
+                                                    )
+                                                )
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (centerBmp != null) {
+                                            Image(
+                                                bitmap = centerBmp,
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(0.97f),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        } else {
+                                            Image(
+                                                painter = painterResource(id = uiState.currentQuestion.imageRes),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(0.97f),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                        }
                                     }
                                 }
                             }
 
-                            // --- DREAPTA (verde + maro + negru) ---
-                            Column(
+                            // --- DREAPTA (cuvânt sus, litere + mascotă jos) ---
+                            BoxWithConstraints(
                                 modifier = Modifier
-                                    .weight(0.38f)
-                                    .fillMaxHeight(),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                    .weight(0.32f)
+                                    .fillMaxHeight()
                             ) {
+                                val rightW = maxWidth
+                                val rightH = maxHeight
 
-                                // (verde) cuvântul
-                                Surface(
-                                    shape = RoundedCornerShape(18.dp),
-                                    color = Color(0xFFFFF3E0).copy(alpha = 0.95f),
-                                    shadowElevation = 6.dp
-                                ) {
-                                    Text(
-                                        text = word,
-                                        fontSize = 38.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color(0xFFE65100),
-                                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
-                                        letterSpacing = 1.sp,
-                                        maxLines = 1
-                                    )
-                                }
+                                // Mascota (lipită de jos). Păstrăm un size sănătos și rezervăm lățime pentru ea.
+                                val mascotSize = (rightH * 0.44f).coerceIn(120.dp, 230.dp)
+                                val reservedForMascot = (mascotSize * 0.82f).coerceIn(110.dp, 200.dp)
 
-                                Spacer(modifier = Modifier.weight(1f))
+                                val optionsCount = uiState.options.size.coerceAtLeast(1)
+                                val spacing = 16.dp
 
-                                if (uiState.isFinished) {
-                                    // La final, panoul de finish ocupă zona de jos (în loc de butoane).
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        contentAlignment = Alignment.BottomCenter
+                                // Dimensiune butoane din lățimea rămasă (după ce rezervăm spațiu pentru mascotă).
+                                val buttonsAreaWidth = (rightW - reservedForMascot - 10.dp).coerceAtLeast(160.dp)
+                                val btnByWidth =
+                                    ((buttonsAreaWidth - spacing * (optionsCount - 1)) / optionsCount.toFloat())
+                                        .coerceAtLeast(70.dp)
+                                val btnByHeight = (rightH * 0.28f).coerceIn(78.dp, 150.dp)
+                                val optionSize = minOf(btnByWidth, btnByHeight).coerceIn(78.dp, 150.dp)
+
+                                Box(modifier = Modifier.fillMaxSize()) {
+
+                                    // (verde) cuvântul sus
+                                    Surface(
+                                        shape = RoundedCornerShape(18.dp),
+                                        color = Color(0xFFFFF3E0).copy(alpha = 0.95f),
+                                        shadowElevation = 6.dp,
+                                        modifier = Modifier
+                                            .align(Alignment.TopCenter)
+                                            .padding(top = 8.dp)
                                     ) {
-                                        FinishPanel(
-                                            score = uiState.score,
-                                            stars = uiState.stars,
-                                            total = uiState.totalQuestions,
-                                            onRestart = { soundPlayer.playClick(); viewModel.resetGame() },
-                                            onBackToMenu = { soundPlayer.playClick(); onBackToMenu() }
+                                        Text(
+                                            text = word,
+                                            fontSize = 44.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFFE65100),
+                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                                            letterSpacing = 1.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
-                                } else {
-                                    // (maro) butoanele + (negru) mascota
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 6.dp),
-                                        verticalAlignment = Alignment.Bottom
-                                    ) {
+
+                                    if (uiState.isFinished) {
+                                        // La final: panel în partea de jos-stânga a zonei drepte; mascota jos-dreapta.
                                         Box(
-                                            modifier = Modifier.weight(1f),
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(end = reservedForMascot),
                                             contentAlignment = Alignment.Center
                                         ) {
+                                            FinishPanel(
+                                                score = uiState.score,
+                                                stars = uiState.stars,
+                                                total = uiState.totalQuestions,
+                                                onRestart = { soundPlayer.playClick(); viewModel.resetGame() },
+                                                onBackToMenu = { soundPlayer.playClick(); onBackToMenu() }
+                                            )
+                                        }
+
+                                        Image(
+                                            painter = painterResource(id = mascotRes),
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(end = 4.dp, bottom = 0.dp)
+                                                .size(mascotSize),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        // (maro) litere jos + (negru) mascotă jos, lângă litere, lipită de jos
+                                        Row(
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .fillMaxWidth()
+                                                .padding(bottom = 0.dp),
+                                            verticalAlignment = Alignment.Bottom
+                                        ) {
                                             Row(
-                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                                verticalAlignment = Alignment.CenterVertically
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(start = 2.dp, end = 8.dp),
+                                                horizontalArrangement = Arrangement.spacedBy(spacing),
+                                                verticalAlignment = Alignment.Bottom
                                             ) {
                                                 uiState.options.forEach { option ->
                                                     val isSelectedCorrect =
@@ -361,23 +411,24 @@ fun AlphabetGameScreen(
                                                     ) {
                                                         Text(
                                                             text = option,
-                                                            fontSize = 44.sp,
+                                                            fontSize = 48.sp,
                                                             fontWeight = FontWeight.Black,
                                                             color = Color.White
                                                         )
                                                     }
                                                 }
                                             }
+
+                                            // Mascota lipită de jos, lângă litere
+                                            Image(
+                                                painter = painterResource(id = mascotRes),
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .padding(end = 4.dp, bottom = 0.dp)
+                                                    .size(mascotSize),
+                                                contentScale = ContentScale.Fit
+                                            )
                                         }
-
-                                        Spacer(modifier = Modifier.width(12.dp))
-
-                                        Image(
-                                            painter = painterResource(id = mascotRes),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(mascotSize),
-                                            contentScale = ContentScale.Fit
-                                        )
                                     }
                                 }
                             }
@@ -598,25 +649,6 @@ fun AlphabetGameScreen(
                                                     }
                                                 }
                                             }
-
-                                            // BUTON HOME peste UI (nu ocupă spațiu)
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(16.dp),
-                                                contentAlignment = Alignment.BottomEnd
-                                            ) {
-                                                SquishyButton(
-                                                    onClick = { soundPlayer.playClick(); onBackToMenu() },
-                                                    size = 50.dp,
-                                                    shape = CircleShape
-                                                ) {
-                                                    Image(
-                                                        painter = painterResource(id = AlphabetUi.Icons.home),
-                                                        contentDescription = "Home",
-                                                        modifier = Modifier.size(28.dp)
-                                                    )
-                                                }
                                             }
                     }
 }
