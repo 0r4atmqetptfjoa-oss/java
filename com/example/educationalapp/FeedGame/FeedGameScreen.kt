@@ -16,7 +16,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.AnimalBandGame.splitSpriteSheet
 import com.example.educationalapp.R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.withFrameNanos
 
 @Composable
 fun FeedGameScreen(
@@ -25,26 +27,68 @@ fun FeedGameScreen(
 ) {
     val context = LocalContext.current
     var monsterFrames by remember { mutableStateOf(listOf<androidx.compose.ui.graphics.ImageBitmap>()) }
+    var loaded by remember { mutableStateOf(false) }
 
+    // --- FIX CRITIC: inScaled = false ---
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val opts = BitmapFactory.Options().apply { inScaled = false }
             val sheet = BitmapFactory.decodeResource(context.resources, R.drawable.monster_sheet, opts)
             val frames = splitSpriteSheet(sheet, 4, 6).map { it.asImageBitmap() }
-            withContext(Dispatchers.Main) { monsterFrames = frames }
+            withContext(Dispatchers.Main) { 
+                monsterFrames = frames 
+                loaded = true
+            }
+        }
+    }
+    
+    // Animatie Monstru
+    var frameIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(loaded, viewModel.monsterState) {
+        var acc = 0f
+        while(isActive && loaded) {
+            val dt = 0.016f
+            withFrameNanos { }
+            acc += dt
+            if(acc >= 0.12f) {
+                acc = 0f
+                frameIndex++
+            }
         }
     }
     
     Box(Modifier.fillMaxSize()) {
         Image(painterResource(R.drawable.game_bg), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         
+        // --- MONSTRU MARE (400.dp) ---
         if (monsterFrames.isNotEmpty()) {
-            Image(monsterFrames[0], "Monster", Modifier.align(Alignment.CenterEnd).size(300.dp))
+            val currentFrame = if (viewModel.monsterState == "EATING") {
+                (frameIndex % 12) + 12 // Randul 2 (Eating)
+            } else {
+                frameIndex % 12 // Randul 1 (Idle)
+            }
+            
+            Image(
+                bitmap = monsterFrames[currentFrame % monsterFrames.size], 
+                contentDescription = "Monster", 
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 50.dp)
+                    .size(400.dp) // L-am facut MARE
+            )
         }
         
+        // Foods Row (Left)
         Column(Modifier.align(Alignment.CenterStart).padding(start = 20.dp)) {
             viewModel.foods.forEach { food ->
-                Image(painterResource(food.resId), null, Modifier.size(100.dp).padding(10.dp).clickable { viewModel.onFed(food) })
+                Image(
+                    painter = painterResource(food.resId), 
+                    contentDescription = null, 
+                    modifier = Modifier
+                        .size(100.dp)
+                        .padding(10.dp)
+                        .clickable { viewModel.onFed(food) }
+                )
             }
         }
         

@@ -3,6 +3,7 @@ package com.example.educationalapp.AnimalBandGame
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -14,27 +15,33 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.withFrameNanos // <--- IMPORTUL CORECT
+import androidx.compose.runtime.withFrameNanos
 import kotlin.math.sin
-import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlin.math.abs
 import kotlin.math.PI
+import kotlin.random.Random
 
 @Composable
 fun AnimalBandGame(
@@ -55,7 +62,7 @@ fun AnimalBandGame(
     val shockwaves = remember { mutableStateListOf<BandShockwave>() }
     var rootSizePx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     
-    // Ancore pentru particule
+    // Ancore
     var frogAnchor by remember { mutableStateOf(Offset.Zero) }
     var bearAnchor by remember { mutableStateOf(Offset.Zero) }
     var catAnchor by remember { mutableStateOf(Offset.Zero) }
@@ -67,10 +74,11 @@ fun AnimalBandGame(
         if (clockNanos <= 0L) 0f else ((clockNanos % viewModel.beatPeriodNanos).toDouble() / viewModel.beatPeriodNanos.toDouble()).toFloat()
     }
 
-    // Incarcare Asincrona cu FIX pentru Scaling
+    // --- FIX CRITIC: inScaled = false ---
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val opts = BitmapFactory.Options().apply { inScaled = false }
+            
             val frogBmp = BitmapFactory.decodeResource(context.resources, R.drawable.band_frog_sheet, opts)
             val bearBmp = BitmapFactory.decodeResource(context.resources, R.drawable.band_bear_sheet, opts)
             val catBmp = BitmapFactory.decodeResource(context.resources, R.drawable.band_cat_sheet, opts)
@@ -90,7 +98,7 @@ fun AnimalBandGame(
         }
     }
 
-    // Bucla de joc
+    // Game Loop
     LaunchedEffect(assetsLoaded) {
         if (!assetsLoaded) return@LaunchedEffect
         var lastFrame = 0L
@@ -104,10 +112,10 @@ fun AnimalBandGame(
             val beatIndex = now / viewModel.beatPeriodNanos
             if (beatIndex != lastBeatIndex) {
                 lastBeatIndex = beatIndex
-                // Spawn particule pe beat
-                if (viewModel.frogPlaying) particles.add(BandParticle.note(frogAnchor))
-                if (viewModel.bearPlaying) particles.add(BandParticle.note(bearAnchor))
-                if (viewModel.catPlaying) particles.add(BandParticle.note(catAnchor))
+                // Beat visual effects
+                if (viewModel.frogPlaying) BandVfxUtils.spawnNoteBurst(particles, frogAnchor, viewModel.jam)
+                if (viewModel.bearPlaying) BandVfxUtils.spawnNoteBurst(particles, bearAnchor, viewModel.jam)
+                if (viewModel.catPlaying) BandVfxUtils.spawnNoteBurst(particles, catAnchor, viewModel.jam)
             }
 
             if (viewModel.jam >= 1f && !viewModel.isFinalJam) {
@@ -122,7 +130,6 @@ fun AnimalBandGame(
         }
     }
 
-    // UI
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -139,12 +146,17 @@ fun AnimalBandGame(
         if (!assetsLoaded) {
             Text("Loading Band...", color = Color.White)
         } else {
-            // HUD
             BandHud(Modifier.align(Alignment.TopCenter), beatPhase, viewModel.jam, viewModel.isFinalJam)
 
-            // Personaje
+            // Bounce effect
+            val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (8f + viewModel.jam * 14f) * (if (viewModel.activeMusiciansCount() > 0) 1f else 0f))
+            
             Row(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 30.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .offset { IntOffset(0, bouncePx.roundToInt()) }
+                    .padding(bottom = 20.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom
             ) {
@@ -165,7 +177,6 @@ fun AnimalBandGame(
                 )
             }
 
-            // VFX
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val note = noteImage
                 shockwaves.forEach { it.draw(this) }
@@ -173,7 +184,6 @@ fun AnimalBandGame(
             }
         }
         
-        // Back
         Image(
             painter = painterResource(id = R.drawable.ui_button_home),
             contentDescription = "Back",
@@ -196,13 +206,15 @@ fun MusicianView(
     var frameIndex by remember { mutableIntStateOf(0) }
     val scale = remember { Animatable(1f) }
 
+    // --- FIX ANIMATION SPEED ---
     LaunchedEffect(playing) {
         var acc = 0f
         while (isActive) {
             val dt = 0.016f 
             withFrameNanos { } 
             acc += dt
-            if (acc >= 0.12f) { // 8 FPS Fix
+            // 0.12f = approx 8 FPS (miscare mai lenta, stil cartoon)
+            if (acc >= 0.12f) { 
                 acc = 0f
                 if (playing) {
                     frameIndex = if (frameIndex < 12) 12 else (frameIndex + 1).takeIf { it <= 23 } ?: 12
@@ -222,7 +234,7 @@ fun MusicianView(
 
     Box(
         modifier = Modifier
-            .size(200.dp)
+            .size(220.dp)
             .scale(scale.value)
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -230,8 +242,11 @@ fun MusicianView(
                 onClick = onClick,
                 onDoubleClick = onDouble
             )
-            .onGloballyPositioned {
-                onAnchor(it.parentCoordinates?.localToWindow(it.localToWindow(Offset.Zero)) ?: Offset.Zero)
+            .onGloballyPositioned { coordinates ->
+                val pos = coordinates.positionInRoot()
+                val size = coordinates.size
+                // Calculam ancora aproximativ la "gura" sau centrul instrumentului
+                onAnchor(Offset(pos.x + size.width * 0.7f, pos.y + size.height * 0.4f))
             },
         contentAlignment = Alignment.Center
     ) {
@@ -260,10 +275,13 @@ fun BandHud(modifier: Modifier, phase: Float, jam: Float, finalJam: Boolean) {
     }
 }
 
+// Helpers
 fun splitSpriteSheet(sheet: Bitmap?, rows: Int, cols: Int): List<Bitmap> {
-    if (sheet == null || rows == 0 || cols == 0) return emptyList()
+    if (sheet == null || rows <= 0 || cols <= 0) return emptyList()
     val w = sheet.width / cols
     val h = sheet.height / rows
+    if (w <= 0 || h <= 0) return emptyList()
+    
     val list = mutableListOf<Bitmap>()
     for (r in 0 until rows) {
         for (c in 0 until cols) {
@@ -273,18 +291,48 @@ fun splitSpriteSheet(sheet: Bitmap?, rows: Int, cols: Int): List<Bitmap> {
     return list
 }
 
+// VFX Utils
+object BandVfxUtils {
+    fun spawnNoteBurst(list: MutableList<BandParticle>, pos: Offset, jam: Float) {
+        if (pos == Offset.Zero) return
+        repeat(3) { list.add(BandParticle.note(pos)) }
+    }
+}
+
 class BandParticle(var x: Float, var y: Float) { 
     var alive = true
     var age = 0f
-    fun update(dt: Float) { age += dt; y -= 100f * dt; if(age > 1f) alive = false }
+    var vx = (Random.nextFloat() - 0.5f) * 200f
+    var vy = -300f - Random.nextFloat() * 200f
+    
+    fun update(dt: Float) { 
+        age += dt
+        x += vx * dt
+        y += vy * dt
+        vy += 800f * dt // Gravity
+        if(age > 1.5f) alive = false 
+    }
+    
     fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, img: ImageBitmap?) {
-        if(img != null) scope.drawImage(img, Offset(x, y), alpha = 1f - age)
+        val alpha = (1f - age / 1.5f).coerceIn(0f, 1f)
+        if(img != null) {
+            scope.withTransform({
+                translate(x, y)
+                scale(1f - age*0.3f)
+            }) {
+                drawImage(img, Offset(-img.width/2f, -img.height/2f), alpha = alpha)
+            }
+        } else {
+            scope.drawCircle(Color.White.copy(alpha), 10f, Offset(x,y))
+        }
     }
     companion object { fun note(pos: Offset) = BandParticle(pos.x, pos.y) }
 }
 
 class BandShockwave(val center: Offset, var radius: Float, val speed: Float, val width: Float, var alpha: Float) { 
     var alive = true
-    fun update(dt: Float) { radius += speed * dt; alpha -= dt; if(alpha<=0) alive=false }
-    fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope) { scope.drawCircle(Color.White.copy(alpha.coerceIn(0f,1f)), radius, center, style = Stroke(width)) }
+    fun update(dt: Float) { radius += speed * dt; alpha -= dt * 1.5f; if(alpha<=0) alive=false }
+    fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope) { 
+        scope.drawCircle(Color.White.copy(alpha.coerceIn(0f,1f)), radius, center, style = Stroke(width)) 
+    }
 }

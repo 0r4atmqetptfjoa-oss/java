@@ -2,6 +2,7 @@ package com.example.educationalapp.EggGame
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -22,7 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.runtime.withFrameNanos // <--- IMPORTUL CORECT
+import androidx.compose.runtime.withFrameNanos
 
 @Composable
 fun EggGameScreen(
@@ -35,10 +36,12 @@ fun EggGameScreen(
     val eggScale = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
 
+    // --- FIX CRITIC: inScaled = false ---
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             val opts = BitmapFactory.Options().apply { inScaled = false }
             val sheet = BitmapFactory.decodeResource(context.resources, R.drawable.dragon_sheet, opts)
+            // Folosim functia din AnimalBandGame sau o duplicam aici daca e private
             val frames = splitSpriteSheet(sheet, 4, 6).map { it.asImageBitmap() }
             withContext(Dispatchers.Main) {
                 dragonFrames = frames
@@ -47,12 +50,18 @@ fun EggGameScreen(
         }
     }
     
+    // --- FIX VITEZA DRAGON ---
     var dragonFrame by remember { mutableIntStateOf(0) }
     LaunchedEffect(loaded) {
+        var acc = 0f
         while(isActive && loaded) {
+            val dt = 0.016f
             withFrameNanos { }
-            // Animatie simpla
-            dragonFrame++
+            acc += dt
+            if (acc >= 0.12f) { // 8 FPS - Incetinit
+                acc = 0f
+                dragonFrame++
+            }
         }
     }
 
@@ -79,15 +88,27 @@ fun EggGameScreen(
                     ) {
                         viewModel.onTapEgg(System.nanoTime())
                         scope.launch { 
-                            eggScale.animateTo(1.1f)
-                            eggScale.animateTo(1f)
+                            eggScale.animateTo(1.1f, tween(100))
+                            eggScale.animateTo(1f, tween(100))
                         }
                     }
             )
         } else {
             if (dragonFrames.isNotEmpty()) {
-                Image(dragonFrames[dragonFrame % dragonFrames.size], "Dragon", 
-                    modifier = Modifier.size(350.dp).clickable { viewModel.onTapEgg(0) })
+                // Afisam dragonul care iese din ou
+                val frameIndex = if (viewModel.dragonMode == DragonAnim.RISE) {
+                    (dragonFrame % 12) + 12 // Randul 2
+                } else {
+                    dragonFrame % 12 // Randul 1 (Idle)
+                }
+                
+                Image(
+                    bitmap = dragonFrames[frameIndex % dragonFrames.size], 
+                    contentDescription = "Dragon", 
+                    modifier = Modifier
+                        .size(380.dp) // Marime generoasa
+                        .clickable { viewModel.onTapEgg(0) }
+                )
             }
         }
         
