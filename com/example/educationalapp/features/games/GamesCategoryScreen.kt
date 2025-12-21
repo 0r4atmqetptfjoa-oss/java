@@ -2,13 +2,7 @@ package com.example.educationalapp.features.games
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -32,20 +26,33 @@ data class GameItem(
     val destination: String
 )
 
-// AICI ADĂUGĂM JOCURILE NOI
 val gamesList = listOf(
-    // Folosim icon_game_hiddenobjects ca placeholder pentru Peek-a-Boo momentan
-    GameItem("Peek-a-Boo", R.drawable.icon_game_hiddenobjects, R.drawable.bg_sunny_meadow, "peekaboo"),
-    GameItem("Alphabet", R.drawable.icon_game_alphabet, R.drawable.bg_game_alphabet, "alphabet"),
-    GameItem("Colors", R.drawable.icon_game_colors, R.drawable.bg_game_colors, "colors"),
-    GameItem("Shapes", R.drawable.icon_game_shapes, R.drawable.bg_game_shapes, "shapes"),
-    GameItem("Puzzle", R.drawable.icon_game_puzzle, R.drawable.bg_game_puzzle, "puzzle"),
-    GameItem("Memory", R.drawable.icon_game_memory, R.drawable.bg_game_memory, "memory"),
-    GameItem("Hidden Objects", R.drawable.icon_game_hiddenobjects, R.drawable.bg_game_hiddenobjects, "hidden"),
-    GameItem("Sorting", R.drawable.icon_game_sorting, R.drawable.bg_game_sorting, "sorting"),
-    GameItem("Instruments", R.drawable.icon_game_instruments, R.drawable.bg_game_instruments, "instruments"),
-    GameItem("Sequence", R.drawable.icon_game_sequence, R.drawable.bg_game_sequence, "sequence"),
-    GameItem("Math", R.drawable.icon_game_math, R.drawable.bg_game_math, "math")
+    // JOC NOU: Balloon Pop
+    GameItem("Balloon Pop", R.drawable.balloon_red, R.drawable.bg_alphabet_sky, GameRoutes.BALLOON_POP),
+
+    GameItem("Peek-a-Boo", R.drawable.icon_game_hiddenobjects, R.drawable.bg_sunny_meadow, GameRoutes.PEEKABOO),
+    
+    // Alphabet
+    GameItem("Alphabet", R.drawable.icon_game_alphabet, R.drawable.bg_game_alphabet, GameRoutes.ALPHABET_GRAPH),
+
+    GameItem("Colors", R.drawable.icon_game_colors, R.drawable.bg_game_colors, GameRoutes.COLORS),
+    GameItem("Shapes", R.drawable.icon_game_shapes, R.drawable.bg_game_shapes, GameRoutes.SHAPES),
+    GameItem("Puzzle", R.drawable.icon_game_puzzle, R.drawable.bg_game_puzzle, GameRoutes.PUZZLE),
+    
+    // Memory - Iconiță și rută standard, dar va deschide jocul nou în Navigation
+    GameItem("Memory", R.drawable.icon_game_memory, R.drawable.bg_game_memory, GameRoutes.MEMORY),
+    
+    GameItem("Hidden Objects", R.drawable.icon_game_hiddenobjects, R.drawable.bg_game_hiddenobjects, GameRoutes.HIDDEN_OBJECTS),
+    GameItem("Sorting", R.drawable.icon_game_sorting, R.drawable.bg_game_sorting, GameRoutes.SORTING),
+
+    GameItem("Instruments", R.drawable.icon_game_instruments, R.drawable.bg_game_instruments, GameRoutes.INSTRUMENTS),
+    GameItem("Sequence", R.drawable.icon_game_sequence, R.drawable.bg_game_sequence, GameRoutes.SEQUENCE),
+    GameItem("Math", R.drawable.icon_game_math, R.drawable.bg_game_math, GameRoutes.MATH),
+
+    // Jocuri extra
+    GameItem("Egg Surprise", R.drawable.icon_game_memory, R.drawable.bg_magic_forest, GameRoutes.EGG_SURPRISE),
+    GameItem("Feed Monster", R.drawable.icon_game_hiddenobjects, R.drawable.game_bg, GameRoutes.FEED_MONSTER),
+    GameItem("Animal Band", R.drawable.icon_game_instruments, R.drawable.bg_game_instruments, GameRoutes.ANIMAL_BAND),
 )
 
 @Composable

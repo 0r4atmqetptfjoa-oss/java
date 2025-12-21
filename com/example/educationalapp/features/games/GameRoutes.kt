@@ -2,16 +2,13 @@ package com.example.educationalapp.features.games
 
 /**
  * Centralized route names for all mini-games.
- *
- * Why this exists:
- * - Prevents route collisions between module menus (e.g. "instruments" menu) and games.
- * - Eliminates brittle index-based lookups (gamesList[4], etc.).
  */
 object GameRoutes {
     const val ALPHABET = "game_alphabet"
     const val ALPHABET_GRAPH = "game_alphabet_graph"
     const val ALPHABET_MENU = "game_alphabet_menu"
     const val ALPHABET_GAME = "game_alphabet_game"
+    const val ALPHABET_QUIZ = "game_alphabet_quiz" // Adăugat pentru consistență cu AppNavigation
 
     const val PEEKABOO = "game_peekaboo"
     const val COLORS = "game_colors"
@@ -36,4 +33,7 @@ object GameRoutes {
     const val EGG_SURPRISE = "game_egg_surprise"
     const val FEED_MONSTER = "game_feed_monster"
     const val ANIMAL_BAND = "game_animal_band"
+    
+    // NOU:
+    const val BALLOON_POP = "game_balloon_pop"
 }

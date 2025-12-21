@@ -1,67 +1,80 @@
 package com.example.educationalapp
 
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.*
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.example.educationalapp.alphabet.AlphabetGameScreen
 import com.example.educationalapp.alphabet.AlphabetMenuScreen
+import com.example.educationalapp.colors.ColorsGameScreen
 import com.example.educationalapp.features.games.*
 import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
 import com.example.educationalapp.features.mainmenu.MainMenuScreen
+import com.example.educationalapp.features.settings.SettingsScreen
 import com.example.educationalapp.features.songs.SongsMenuScreen
 import com.example.educationalapp.features.songs.SongPlayerScreen
 import com.example.educationalapp.features.sounds.*
 import com.example.educationalapp.features.stories.StoriesMenuScreen
-
-// >>> IMPORTURI JOCURI NOI <<<
-import com.example.educationalapp.colors.ColorsGameScreen 
-import com.example.educationalapp.shapes.ShapesGameScreen
+import com.example.educationalapp.peekaboo.PeekABooGame
 import com.example.educationalapp.puzzle.PuzzleGameScreen
-import com.example.educationalapp.peekaboo.PeekABooGame // Importul pentru jocul nou
+import com.example.educationalapp.shapes.ShapesGameScreen
 
-object Routes {
-    const val ALPHABET_GRAPH = "alphabet_graph"
-    const val ALPHABET_MENU = "alphabet_menu"
-    const val ALPHABET_GAME = "alphabet_game"
+// IMPORTURI NOI:
+import com.example.educationalapp.BalloonGame.BalloonGameScreen
+import com.example.educationalapp.MemoryGame.MemoryGameScreen
+// (Opțional: Egg, Feed, AnimalBand imports dacă nu sunt deja importate prin * )
+import com.example.educationalapp.AnimalBandGame.AnimalBandGame
+// import com.example.educationalapp.EggGame.EggGameScreen // asigură-te că există
+// import com.example.educationalapp.FeedGame.FeedGameScreen // asigură-te că există
+
+/**
+ * Helper: încearcă să se întoarcă la GamesMenu dacă există în backstack,
+ * altfel navighează acolo.
+ */
+private fun backToGames(navController: NavController) {
+    val popped = navController.popBackStack(Screen.GamesMenu.route, false)
+    if (!popped) {
+        navController.navigate(Screen.GamesMenu.route)
+    }
 }
 
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
     val navController = rememberNavController()
 
-    // Collect state from the ViewModel
     val starCount by viewModel.starCount.collectAsState()
     val soundEnabled by viewModel.soundEnabled.collectAsState()
     val musicEnabled by viewModel.musicEnabled.collectAsState()
     val hardModeEnabled by viewModel.hardModeEnabled.collectAsState()
 
-    // Local star state used by games.
     val starState = remember { mutableStateOf(starCount) }
-    
+
     LaunchedEffect(starCount) {
-        if (starState.value != starCount) {
-            starState.value = starCount
-        }
+        if (starState.value != starCount) starState.value = starCount
     }
-    
     LaunchedEffect(starState.value) {
         viewModel.setStarCount(starState.value)
     }
 
+    val gameByRoute = remember {
+        gamesList.associateBy { it.destination }
+    }
+
+    fun wrap(route: String, content: @Composable () -> Unit): @Composable () -> Unit = {
+        val game = gameByRoute[route]
+        if (game != null) {
+            GameContainer(game) { content() }
+        } else {
+            content()
+        }
+    }
+
     NavHost(navController = navController, startDestination = Screen.MainMenu.route) {
+
         composable(Screen.MainMenu.route) {
-            MainMenuScreen(
-                navController = navController,
-                starCount = starCount
-            )
+            MainMenuScreen(navController = navController, starCount = starCount)
         }
 
         composable(Screen.SettingsScreen.route) {
@@ -76,81 +89,89 @@ fun AppNavigation(viewModel: MainViewModel) {
             )
         }
 
-        composable("games") {
+        composable(Screen.GamesMenu.route) {
             GamesCategoryScreen { selected ->
-                if (selected.destination == "alphabet") {
-                    navController.navigate(Routes.ALPHABET_GRAPH)
-                } else {
-                    navController.navigate(selected.destination)
-                }
+                navController.navigate(selected.destination)
             }
         }
 
-        // --- NAVIGATION FOR ALPHABET GAME ---
-        navigation(startDestination = Routes.ALPHABET_MENU, route = Routes.ALPHABET_GRAPH) {
-            composable(Routes.ALPHABET_MENU) {
+        navigation(
+            startDestination = GameRoutes.ALPHABET_MENU,
+            route = GameRoutes.ALPHABET_GRAPH
+        ) {
+            composable(GameRoutes.ALPHABET_MENU) {
                 AlphabetMenuScreen(
-                    onPlayClick = { navController.navigate(Routes.ALPHABET_GAME) },
+                    onPlayClick = { navController.navigate(GameRoutes.ALPHABET_QUIZ) },
                     onBackToHome = { navController.popBackStack(Screen.MainMenu.route, false) }
                 )
             }
-            composable(Routes.ALPHABET_GAME) {
+            composable(GameRoutes.ALPHABET_QUIZ) {
                 AlphabetGameScreen(
                     onBackToMenu = { navController.popBackStack() }
                 )
             }
         }
 
-        // >>> JOCURILE NOI <<<
+        // --- JOCURI STANDARD ---
+        composable(GameRoutes.PEEKABOO) { wrap(GameRoutes.PEEKABOO) { PeekABooGame(onHome = { backToGames(navController) }) }() }
+        composable(GameRoutes.COLORS) { wrap(GameRoutes.COLORS) { ColorsGameScreen(onBack = { backToGames(navController) }) }() }
+        composable(GameRoutes.SHAPES) { wrap(GameRoutes.SHAPES) { ShapesGameScreen(onBack = { backToGames(navController) }) }() }
+        composable(GameRoutes.PUZZLE) { wrap(GameRoutes.PUZZLE) { PuzzleGameScreen(onBack = { backToGames(navController) }) }() }
 
-        composable("peekaboo") {
-            // Nu folosim GameContainer aici neapărat pentru că PeekABoo are fundalul lui propriu integrat
-            PeekABooGame(onHome = { navController.popBackStack() })
+        // --- JOCURI ACTUALIZATE / NOI ---
+        
+        // Memory folosind noul MemoryGameScreen (MVVM)
+        composable(GameRoutes.MEMORY) { 
+            wrap(GameRoutes.MEMORY) { 
+                MemoryGameScreen(
+                    onHome = { backToGames(navController) }
+                ) 
+            }() 
         }
 
-        composable("colors") {
-            ColorsGameScreen(onBack = { navController.popBackStack() })
+        // Balloon Pop (NOU)
+        composable(GameRoutes.BALLOON_POP) {
+            wrap(GameRoutes.BALLOON_POP) {
+                BalloonGameScreen(
+                    onHome = { backToGames(navController) }
+                )
+            }()
         }
 
-        composable("shapes") {
-            ShapesGameScreen(onBack = { navController.popBackStack() })
-        }
-
-        composable("puzzle") {
-            PuzzleGameScreen(onBack = { navController.popBackStack() })
+        // Animal Band (Actualizat)
+        composable(GameRoutes.ANIMAL_BAND) { 
+            wrap(GameRoutes.ANIMAL_BAND) { 
+                AnimalBandGame(
+                    onHome = { backToGames(navController) }
+                ) 
+            }() 
         }
 
         // Restul jocurilor
-        composable("memory") { GameContainer(gamesList[4]) { MemoryGameScreen(navController = navController, starState = starState) } }
-        composable("hidden") { GameContainer(gamesList[5]) { HiddenObjectsGameScreen(navController = navController, starState = starState) } }
-        composable("sorting") { GameContainer(gamesList[6]) { SortingGameScreen(navController = navController, starState = starState) } }
-        composable("instruments") { GameContainer(gamesList[7]) { InstrumentsGameScreen(navController = navController, starState = starState) } }
-        composable("sequence") { GameContainer(gamesList[9]) { SequenceMemoryGameScreen(navController = navController, starState = starState) } }
-        composable("math") { GameContainer(gamesList[10]) { MathGameScreen(navController = navController, starState = starState) } }
+        composable(GameRoutes.HIDDEN_OBJECTS) { wrap(GameRoutes.HIDDEN_OBJECTS) { HiddenObjectsGameScreen(navController, starState) }() }
+        composable(GameRoutes.SORTING) { wrap(GameRoutes.SORTING) { SortingGameScreen(navController, starState) }() }
+        composable(GameRoutes.INSTRUMENTS) { wrap(GameRoutes.INSTRUMENTS) { InstrumentsGameScreen(navController, starState) }() }
+        composable(GameRoutes.SEQUENCE) { wrap(GameRoutes.SEQUENCE) { SequenceMemoryGameScreen(navController, starState) }() }
+        composable(GameRoutes.MATH) { wrap(GameRoutes.MATH) { MathGameScreen(navController, starState) }() }
 
-        // Menu screens
+        // Placeholder pt jocurile Egg/Feed dacă nu sunt implementate complet, altfel lasă-le așa:
+        composable(GameRoutes.EGG_SURPRISE) { wrap(GameRoutes.EGG_SURPRISE) { EggGameScreen(onHome = { backToGames(navController) }) }() }
+        composable(GameRoutes.FEED_MONSTER) { wrap(GameRoutes.FEED_MONSTER) { FeedGameScreen(onHome = { backToGames(navController) }) }() }
+
+        // --- MENIURI SECUNDARE ---
         composable(Screen.SoundsMenu.route) { SoundsMenuScreen(navController) }
         composable(Screen.InstrumentsMenu.route) { InstrumentsMenuScreen(navController) }
         composable(Screen.StoriesMenu.route) { StoriesMenuScreen(navController) }
         composable(Screen.SongsMenu.route) { SongsMenuScreen(navController) }
 
-        // Individual sound screens
         composable(Screen.WildSounds.route) { WildSoundsScreen() }
         composable(Screen.MarineSounds.route) { MarineSoundsScreen() }
         composable(Screen.FarmSounds.route) { FarmSoundsScreen() }
         composable(Screen.BirdSounds.route) { BirdSoundsScreen() }
 
-        composable(Screen.Song1.route) { backStackEntry ->
-            SongPlayerScreen(navController = navController, backStackEntry = backStackEntry, starState = starState)
-        }
-        composable(Screen.Song2.route) { backStackEntry ->
-            SongPlayerScreen(navController = navController, backStackEntry = backStackEntry, starState = starState)
-        }
-        composable(Screen.Song3.route) { backStackEntry ->
-            SongPlayerScreen(navController = navController, backStackEntry = backStackEntry, starState = starState)
-        }
-        composable(Screen.Song4.route) { backStackEntry ->
-            SongPlayerScreen(navController = navController, backStackEntry = backStackEntry, starState = starState)
-        }
+        composable(Screen.Song1.route) { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
+        composable(Screen.Song2.route) { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
+        composable(Screen.Song3.route) { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
+        composable(Screen.Song4.route) { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
     }
 }
