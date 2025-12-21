@@ -545,9 +545,13 @@ fun AlphabetGameScreen(
                                                                 score = uiState.score,
                                                                 stars = uiState.stars,
                                                                 total = uiState.totalQuestions,
-                                                                onReplay = {
+                                                                onRestart = {
                                                                     soundPlayer.playClick()
                                                                     viewModel.resetGame()
+                                                                },
+                                                                onBackToMenu = {
+                                                                    soundPlayer.playClick()
+                                                                    onBackToMenu()
                                                                 }
                                                             )
                                                         } else {
@@ -779,7 +783,8 @@ private fun FinishPanel(
     score: Int,
     stars: Int,
     total: Int,
-    onReplay: () -> Unit
+    onRestart: () -> Unit,
+    onBackToMenu: () -> Unit
 ) {
     // Local responsive flag for this composable (it is not in scope from the parent).
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -819,7 +824,7 @@ private fun FinishPanel(
             Spacer(modifier = Modifier.height(14.dp))
 
             SquishyButton(
-                onClick = onReplay,
+                onClick = onRestart,
                 modifier = Modifier
                     .height(56.dp)
                     .fillMaxWidth(),
@@ -846,6 +851,38 @@ private fun FinishPanel(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            SquishyButton(
+                onClick = onBackToMenu,
+                modifier = Modifier
+                    .height(52.dp)
+                    .fillMaxWidth()
+                    .border(2.dp, Color(0xFFF39C12), RoundedCornerShape(18.dp)),
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White,
+                elevation = 0.dp
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Image(
+                        painter = painterResource(id = AlphabetUi.Icons.home),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "MENIU",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFFF39C12)
+                    )
+                }
+            }
+
         }
     }
 }
