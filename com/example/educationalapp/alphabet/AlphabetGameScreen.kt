@@ -5,10 +5,12 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -46,7 +48,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.jvm.JvmSynthetic
@@ -59,19 +63,21 @@ fun AlphabetGameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val soundPlayer = remember { AlphabetSoundPlayer(context) }
-    DisposableEffect(Unit) {
-        onDispose { soundPlayer.release() }
-    }
+    DisposableEffect(Unit) { onDispose { soundPlayer.release() } }
+    LaunchedEffect(uiState.soundOn) { soundPlayer.isEnabled = uiState.soundOn }
 
-    LaunchedEffect(uiState.soundOn) {
-        soundPlayer.isEnabled = uiState.soundOn
-    }
-
+    // --- STĂRI ANIMAȚII ---
     var confettiBurstId by remember { mutableLongStateOf(0L) }
     val shakeX = remember { Animatable(0f) }
 
+    // Stare pentru litera zburătoare
+    var flyingLetter by remember { mutableStateOf<String?>(null) }
+    val flyingAnimatable = remember { Animatable(0f) }
+
+    // Reacții
     LaunchedEffect(uiState.isAnswerCorrect) {
         when (uiState.isAnswerCorrect) {
             true -> {
@@ -96,159 +102,183 @@ fun AlphabetGameScreen(
 
     ConfettiBox(burstId = confettiBurstId) {
         Box(modifier = Modifier.fillMaxSize()) {
-            Image(
-                painter = painterResource(id = AlphabetUi.Backgrounds.sky),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            Image(painter = painterResource(id = AlphabetUi.Backgrounds.sky), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-                Image(
-                    painter = painterResource(id = AlphabetUi.Backgrounds.city),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.4f).alpha(0.6f),
-                    contentScale = ContentScale.FillBounds
-                )
+                Image(painter = painterResource(id = AlphabetUi.Backgrounds.city), contentDescription = null, modifier = Modifier.fillMaxWidth().fillMaxHeight(0.4f).alpha(0.6f), contentScale = ContentScale.FillBounds)
             }
             Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.10f)))))
 
             Column(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
                 HeaderBar(
-                    score = uiState.score,
-                    stars = uiState.stars,
-                    questionIndex = uiState.questionIndex,
-                    totalQuestions = uiState.totalQuestions,
-                    attemptsLeft = uiState.attemptsLeft,
-                    soundOn = uiState.soundOn,
-                    onToggleSound = {
-                        if (uiState.soundOn) soundPlayer.playClick()
-                        viewModel.toggleSound()
-                        if (!uiState.soundOn) soundPlayer.playClick()
-                    },
+                    score = uiState.score, stars = uiState.stars, questionIndex = uiState.questionIndex, totalQuestions = uiState.totalQuestions, attemptsLeft = uiState.attemptsLeft, soundOn = uiState.soundOn,
+                    onToggleSound = { if (uiState.soundOn) soundPlayer.playClick(); viewModel.toggleSound(); if (!uiState.soundOn) soundPlayer.playClick() },
                     onHome = { soundPlayer.playClick(); onBackToMenu() }
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                    val isLandscape = maxWidth > maxHeight
+                    val mainMaxWidth = this.maxWidth
+                    val mainMaxHeight = this.maxHeight
+                    val isLandscape = mainMaxWidth > mainMaxHeight
                     val gap = if (isLandscape) 10.dp else 12.dp
 
-                    val cardWidth = (maxWidth * if (isLandscape) 0.60f else 0.72f).coerceIn(300.dp, if (isLandscape) 760.dp else 420.dp)
-                    val cardHeight = (maxHeight * if (isLandscape) 0.72f else 0.48f).coerceIn(200.dp, if (isLandscape) 440.dp else 280.dp)
+                    val cardWidth = (mainMaxWidth * if (isLandscape) 0.60f else 0.72f).coerceIn(300.dp, if (isLandscape) 760.dp else 420.dp)
+                    val cardHeight = (mainMaxHeight * if (isLandscape) 0.65f else 0.48f).coerceIn(200.dp, if (isLandscape) 440.dp else 280.dp)
                     val mascotBaseSize = if (isLandscape) 150.dp else 135.dp
-                    val optionBaseSize = if (isLandscape) 100.dp else 94.dp
+                    val optionBaseSize = if (isLandscape) 90.dp else 94.dp
 
                     val isCorrect = uiState.isAnswerCorrect == true
                     val isWrong = uiState.isAnswerCorrect == false
-                    val borderColor by animateColorAsState(
-                        targetValue = when {
-                            isCorrect -> Color(0xFF43A047)
-                            isWrong -> Color(0xFFE53935)
-                            else -> Color(0xFFFF9800)
-                        }, label = "cardBorder"
-                    )
-                    val cardScale by animateFloatAsState(
-                        targetValue = if (isCorrect) 1.03f else if (isWrong) 0.99f else 1.0f, label = "cardScale"
-                    )
-                    val word = remember(uiState.currentQuestion.word) {
-                        val w = uiState.currentQuestion.word
-                        if (w.isNotEmpty()) "_" + w.drop(1) else "_"
-                    }
-                    val mascotRes = when (uiState.mascotMood) {
-                        MascotMood.HAPPY, MascotMood.CELEBRATE -> AlphabetUi.Mascot.happy
-                        MascotMood.SURPRISED -> AlphabetUi.Mascot.surprised
-                        MascotMood.THINKING -> AlphabetUi.Mascot.thinking
-                        else -> AlphabetUi.Mascot.normal
-                    }
+                    val borderColor by animateColorAsState(targetValue = when { isCorrect -> Color(0xFF43A047); isWrong -> Color(0xFFE53935); else -> Color(0xFFFF9800) }, label = "cardBorder")
+                    val cardScale by animateFloatAsState(targetValue = if (isCorrect) 1.03f else if (isWrong) 0.99f else 1.0f, label = "cardScale")
+                    
+                    val mascotRes = when (uiState.mascotMood) { MascotMood.HAPPY, MascotMood.CELEBRATE -> AlphabetUi.Mascot.happy; MascotMood.SURPRISED -> AlphabetUi.Mascot.surprised; MascotMood.THINKING -> AlphabetUi.Mascot.thinking; else -> AlphabetUi.Mascot.normal }
 
                     if (isLandscape) {
-                        Row(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(modifier = Modifier.weight(0.68f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                                val w = minOf(cardWidth, maxWidth * 0.70f)
-                                val h = minOf(cardHeight, maxHeight * 0.85f)
+                        // =========================================================================
+                        // LANDSCAPE MODE
+                        // =========================================================================
+                        
+                        // >>>>>> ZONA DE CONFIGURARE MANUALĂ (AICI MODIFICI POZIȚIILE) <<<<<<
+                        
+                        // 1. POZIȚIE CARD (IMAGINE)
+                        val cardOffsetX = 0.dp        // Stânga (-) / Dreapta (+)
+                        val cardOffsetY = (-10).dp    // Sus (-) / Jos (+)
+
+                        // 2. POZIȚIE LITERE (BUTOANE) - Sunt sub card
+                        val lettersOffsetX = 0.dp     // Stânga (-) / Dreapta (+)
+                        val lettersOffsetY = 10.dp    // Sus (-) / Jos (+)
+
+                        // 3. POZIȚIE MASCOTĂ (VULPEA)
+                        val mascotOffsetX = (-10).dp  // Stânga (-) / Dreapta (+)
+                        val mascotOffsetY = 20.dp     // Sus (-) / Jos (+)
+
+                        // 4. POZIȚIE CUVÂNT (TEXT SUS)
+                        val wordOffsetX = 0.dp        // Stânga (-) / Dreapta (+)
+                        val wordOffsetY = 30.dp       // Sus (-) / Jos (+)
+                        
+                        // >>>>>> FINAL ZONA DE CONFIGURARE <<<<<<
+
+
+                        // Logică afișare cuvânt (Magic Sync)
+                        var displayedWord by remember { mutableStateOf("") }
+                        var isWordPopping by remember { mutableStateOf(false) }
+                        val wordScale by animateFloatAsState(if (isWordPopping) 1.2f else 1f, spring(dampingRatio = 0.5f))
+
+                        LaunchedEffect(uiState.currentQuestion, uiState.isAnswerCorrect) {
+                            val w = uiState.currentQuestion.word
+                            val masked = if (w.isNotEmpty()) "_" + w.drop(1) else "_"
+                            val full = w.replaceFirstChar { it.uppercaseChar() }
+
+                            if (uiState.isAnswerCorrect == true) {
+                                delay(800) // Așteptăm zborul literei
+                                displayedWord = full
+                                isWordPopping = true
+                                delay(150)
+                                isWordPopping = false
+                            } else {
+                                displayedWord = masked
+                            }
+                        }
+
+                        Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                            // --- STÂNGA: CARD + BUTOANE ---
+                            Column(modifier = Modifier.weight(0.65f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                // CARD
                                 Box(
-                                    modifier = Modifier
-                                        .width(w).height(h)
-                                        .scale(cardScale)
-                                        .graphicsLayer { translationX = shakeX.value }
-                                        .shadow(12.dp, RoundedCornerShape(22.dp))
-                                        .background(Color.White, RoundedCornerShape(22.dp))
-                                        .border(BorderStroke(4.dp, borderColor), RoundedCornerShape(22.dp))
-                                        .padding(7.dp)
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.offset(x = cardOffsetX, y = cardOffsetY) // <--- Folosește variabila ta
                                 ) {
-                                    val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 1100)
-                                    Box(
-                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))
-                                            .background(Brush.verticalGradient(listOf(Color(0xFFE3F2FD), Color(0xFFF1F8E9)))),
-                                        contentAlignment = Alignment.Center
+                                    val w = minOf(cardWidth, mainMaxWidth * 0.70f)
+                                    val h = minOf(cardHeight, mainMaxHeight * 0.85f)
+                                    Box(modifier = Modifier.width(w).height(h).scale(cardScale).graphicsLayer { translationX = shakeX.value }.shadow(12.dp, RoundedCornerShape(22.dp)).background(Color.White, RoundedCornerShape(22.dp)).border(BorderStroke(4.dp, borderColor), RoundedCornerShape(22.dp)).padding(7.dp)) {
+                                        val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 1100)
+                                        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFFE3F2FD), Color(0xFFF1F8E9)))), contentAlignment = Alignment.Center) {
+                                            if (centerBmp != null) Image(bitmap = centerBmp, contentDescription = null, modifier = Modifier.fillMaxSize(0.97f), contentScale = ContentScale.Fit)
+                                            else Image(painter = painterResource(id = uiState.currentQuestion.imageRes), contentDescription = null, modifier = Modifier.fillMaxSize(0.97f), contentScale = ContentScale.Fit)
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                // BUTOANE LITERE
+                                if (!uiState.isFinished) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(20.dp),
+                                        modifier = Modifier.offset(x = lettersOffsetX, y = lettersOffsetY) // <--- Folosește variabila ta
                                     ) {
-                                        if (centerBmp != null) {
-                                            Image(bitmap = centerBmp, contentDescription = null, modifier = Modifier.fillMaxSize(0.97f), contentScale = ContentScale.Fit)
-                                        } else {
-                                            Image(painter = painterResource(id = uiState.currentQuestion.imageRes), contentDescription = null, modifier = Modifier.fillMaxSize(0.97f), contentScale = ContentScale.Fit)
+                                        uiState.options.forEach { option ->
+                                            val isCorrectOption = AlphabetAssets.normalizeBase(option) == AlphabetAssets.normalizeBase(uiState.currentQuestion.displayLetter)
+                                            val isSelectedCorrect = uiState.isAnswerCorrect == true && isCorrectOption
+                                            val isSelectedWrong = uiState.isAnswerCorrect == false && uiState.selectedOption == option
+                                            val containerColor = when { isSelectedCorrect -> Color(0xFF4CAF50); isSelectedWrong -> Color(0xFFEF5350); else -> Color(0xFFFF9800) }
+
+                                            SquishyButton(
+                                                onClick = {
+                                                    if (!uiState.isInputLocked) {
+                                                        soundPlayer.playClick()
+                                                        if (isCorrectOption) {
+                                                            flyingLetter = option
+                                                            scope.launch {
+                                                                flyingAnimatable.snapTo(0f)
+                                                                flyingAnimatable.animateTo(1f, animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing))
+                                                                flyingLetter = null
+                                                            }
+                                                        }
+                                                        viewModel.selectAnswer(option)
+                                                    }
+                                                },
+                                                size = optionBaseSize, shape = CircleShape, color = containerColor, elevation = 10.dp
+                                            ) {
+                                                Text(text = option, fontSize = 48.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                            }
                                         }
                                     }
                                 }
                             }
 
-                            // --- MODIFICAREA ESTE AICI ---
-                            // Am dat un nume explicit (rightBox) scope-ului
-                            BoxWithConstraints(
-                                modifier = Modifier.weight(0.32f).fillMaxHeight()
-                            ) { rightBox -> 
-                            
-                                val rightW = rightBox.maxWidth
-                                val rightH = rightBox.maxHeight
-
-                                val mascotSize = (rightH * 0.44f).coerceIn(120.dp, 230.dp)
-                                val reservedForMascot = (mascotSize * 0.82f).coerceIn(110.dp, 200.dp)
-                                val optionsCount = uiState.options.size.coerceAtLeast(1)
-                                val spacing = 16.dp
-                                val buttonsAreaWidth = (rightW - reservedForMascot - 10.dp).coerceAtLeast(160.dp)
-                                val btnByWidth = ((buttonsAreaWidth - spacing * (optionsCount - 1)) / optionsCount.toFloat()).coerceAtLeast(70.dp)
-                                val btnByHeight = (rightH * 0.28f).coerceIn(78.dp, 150.dp)
-                                val optionSize = minOf(btnByWidth, btnByHeight).coerceIn(78.dp, 150.dp)
-
-                                Box(modifier = Modifier.fillMaxSize()) {
-                                    Surface(
-                                        shape = RoundedCornerShape(18.dp),
-                                        color = Color(0xFFFFF3E0).copy(alpha = 0.95f),
-                                        shadowElevation = 6.dp,
-                                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)
-                                    ) {
-                                        Text(text = word, fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFE65100), modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp), letterSpacing = 1.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            // --- DREAPTA: CUVÂNT + MASCOTĂ ---
+                            Box(modifier = Modifier.weight(0.35f).fillMaxHeight()) {
+                                // CUVÂNT
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .offset(x = wordOffsetX, y = wordOffsetY) // <--- Folosește variabila ta
+                                ) {
+                                    Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFFFFF3E0).copy(alpha = 0.95f), shadowElevation = 6.dp) {
+                                        Text(
+                                            text = displayedWord,
+                                            fontSize = 44.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFFE65100),
+                                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp).scale(wordScale),
+                                            letterSpacing = 1.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                     }
+                                }
 
-                                    if (uiState.isFinished) {
-                                        Box(modifier = Modifier.fillMaxSize().padding(end = reservedForMascot), contentAlignment = Alignment.Center) {
-                                            FinishPanel(score = uiState.score, stars = uiState.stars, total = uiState.totalQuestions, onRestart = { soundPlayer.playClick(); viewModel.resetGame() }, onBackToMenu = { soundPlayer.playClick(); onBackToMenu() })
-                                        }
-                                        Image(painter = painterResource(id = mascotRes), contentDescription = null, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 4.dp, bottom = 0.dp).size(mascotSize), contentScale = ContentScale.Fit)
-                                    } else {
-                                        Row(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 0.dp), verticalAlignment = Alignment.Bottom) {
-                                            Row(modifier = Modifier.weight(1f).padding(start = 2.dp, end = 8.dp), horizontalArrangement = Arrangement.spacedBy(spacing), verticalAlignment = Alignment.Bottom) {
-                                                uiState.options.forEach { option ->
-                                                    val isSelectedCorrect = uiState.isAnswerCorrect == true && AlphabetAssets.normalizeBase(option) == AlphabetAssets.normalizeBase(uiState.currentQuestion.displayLetter)
-                                                    val isSelectedWrong = uiState.isAnswerCorrect == false && uiState.selectedOption == option
-                                                    val containerColor = when { isSelectedCorrect -> Color(0xFF4CAF50); isSelectedWrong -> Color(0xFFEF5350); else -> Color(0xFFFF9800) }
-                                                    SquishyButton(onClick = { if (!uiState.isInputLocked) { soundPlayer.playClick(); viewModel.selectAnswer(option) } }, size = optionSize, shape = CircleShape, color = containerColor, elevation = 10.dp) {
-                                                        Text(text = option, fontSize = 48.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                                    }
-                                                }
-                                            }
-                                            Image(painter = painterResource(id = mascotRes), contentDescription = null, modifier = Modifier.padding(end = 4.dp, bottom = 0.dp).size(mascotSize), contentScale = ContentScale.Fit)
-                                        }
+                                if (uiState.isFinished) {
+                                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        FinishPanel(score = uiState.score, stars = uiState.stars, total = uiState.totalQuestions, onRestart = { soundPlayer.playClick(); viewModel.resetGame() }, onBackToMenu = { soundPlayer.playClick(); onBackToMenu() })
                                     }
+                                } else {
+                                    // MASCOTA
+                                    Image(
+                                        painter = painterResource(id = mascotRes),
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .size(mascotBaseSize * 1.2f)
+                                            .offset(x = mascotOffsetX, y = mascotOffsetY), // <--- Folosește variabila ta
+                                        contentScale = ContentScale.Fit
+                                    )
                                 }
                             }
                         }
                     } else {
-                        // PORTRAIT
+                        // --- PORTRAIT MODE ---
                         Column(modifier = Modifier.fillMaxSize()) {
                             Row(modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.weight(0.6f).fillMaxHeight(), contentAlignment = Alignment.Center) {
@@ -292,13 +322,45 @@ fun AlphabetGameScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-    }
+
+                    // --- LITERA MAGICĂ (FLYING LETTER) ---
+                    if (flyingLetter != null && isLandscape) {
+                        val progress = flyingAnimatable.value
+                        
+                        // Poți ajusta manual punctele de start și finish și aici
+                        val startPos = Offset(with(LocalDensity.current) { mainMaxWidth.toPx() * 0.25f }, with(LocalDensity.current) { mainMaxHeight.toPx() * 0.8f })
+                        val endPos = Offset(with(LocalDensity.current) { mainMaxWidth.toPx() * 0.80f }, with(LocalDensity.current) { mainMaxHeight.toPx() * 0.15f })
+                        
+                        val currentPos = startPos + (endPos - startPos) * progress
+                        val scale = 1f + (0.6f - 1f) * progress
+                        val rotation = 0f + (360f - 0f) * progress
+                        val alpha = 1f - (progress * 1.3f).coerceAtMost(1f)
+
+                        Box(modifier = Modifier.fillMaxSize().zIndex(100f)) {
+                            Text(
+                                text = flyingLetter!!,
+                                fontSize = 56.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFFE65100),
+                                modifier = Modifier.graphicsLayer {
+                                    translationX = currentPos.x
+                                    translationY = currentPos.y
+                                    scaleX = scale
+                                    scaleY = scale
+                                    rotationZ = rotation
+                                    this.alpha = alpha
+                                }
+                            )
+                        }
+                    }
+
+                } // End BoxWithConstraints
+            } // End Column
+        } // End Box
+    } // End Confetti
 }
 
-// COMPONENTS (HeaderBar, FinishPanel, SquishyButton, Confetti)
+// RESTUL COMPONENTELOR (HeaderBar, FinishPanel, SquishyButton, ConfettiBox) RĂMÂN NESCHIMBATE
 @Composable
 private fun HeaderBar(score: Int, stars: Int, questionIndex: Int, totalQuestions: Int, attemptsLeft: Int, soundOn: Boolean, onToggleSound: () -> Unit, onHome: () -> Unit) {
     val progress = if (totalQuestions > 0) (questionIndex + 1) / totalQuestions.toFloat() else 0f

@@ -51,8 +51,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
         val firstItem = if (questionDeck.isNotEmpty()) {
             questionDeck[0]
         } else {
-            // AICI: Am adăugat `baseLetter`
-            AlphabetItem(displayLetter = "A", baseLetter = "A", word = "Albină", imageRes = 0)
+            AlphabetItem(displayLetter = "A", baseLetter = 'A', word = "Albină", imageRes = 0)
         }
         
         val (q, opts) = if (questionDeck.isNotEmpty()) generateQuestion(0) else (firstItem to listOf("A", "B", "C"))
@@ -72,8 +71,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
 
     private fun generateQuestion(questionIndex: Int): Pair<AlphabetItem, List<String>> {
         if (questionDeck.isEmpty()) {
-            // AICI: Am adăugat `baseLetter`
-            return AlphabetItem(displayLetter = "?", baseLetter = "?", word = "Error", imageRes = 0) to emptyList()
+            return AlphabetItem(displayLetter = "?", baseLetter = '?', word = "Error", imageRes = 0) to emptyList()
         }
         
         val current = questionDeck[questionIndex.coerceIn(questionDeck.indices)]
@@ -116,7 +114,8 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
                 mascotMood = MascotMood.HAPPY
             )
             viewModelScope.launch {
-                delay(900L)
+                // MODIFICARE: Am mărit delay-ul la 2.5 secunde pentru a lăsa animația să ruleze
+                delay(2500L) 
                 moveToNextOrFinish()
             }
         } else {
