@@ -2,12 +2,10 @@ package com.example.educationalapp.EggGame
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,9 +32,8 @@ fun EggGameScreen(
     val context = LocalContext.current
     var dragonFrames by remember { mutableStateOf(listOf<androidx.compose.ui.graphics.ImageBitmap>()) }
     var loaded by remember { mutableStateOf(false) }
-    
-    // Scale animation for feedback
     val eggScale = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -50,13 +47,12 @@ fun EggGameScreen(
         }
     }
     
-    // Dragon Animation Loop
     var dragonFrame by remember { mutableIntStateOf(0) }
-    LaunchedEffect(loaded, viewModel.dragonMode) {
+    LaunchedEffect(loaded) {
         while(isActive && loaded) {
             withFrameNanos { }
-            // Logic for animation frames based on viewModel.dragonMode
-            // ... (similar to Band)
+            // Animatie simpla
+            dragonFrame++
         }
     }
 
@@ -82,8 +78,10 @@ fun EggGameScreen(
                         indication = null
                     ) {
                         viewModel.onTapEgg(System.nanoTime())
-                        // Trigger local animation
-                        // launch { eggScale.animateTo(1.1f); eggScale.animateTo(1f) }
+                        scope.launch { 
+                            eggScale.animateTo(1.1f)
+                            eggScale.animateTo(1f)
+                        }
                     }
             )
         } else {
@@ -93,7 +91,6 @@ fun EggGameScreen(
             }
         }
         
-        // Home Btn
          Image(
             painter = painterResource(id = R.drawable.ui_button_home),
             contentDescription = "Home",

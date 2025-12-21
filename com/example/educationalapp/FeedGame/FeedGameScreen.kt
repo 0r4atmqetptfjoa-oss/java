@@ -35,26 +35,19 @@ fun FeedGameScreen(
         }
     }
     
-    // Drag and Drop Logic UI ...
-    // Aici vei folosi codul tău existent pentru DraggableFoodIcon, dar vei apela viewModel.onFed(food)
-    
     Box(Modifier.fillMaxSize()) {
         Image(painterResource(R.drawable.game_bg), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         
-        // Monster
         if (monsterFrames.isNotEmpty()) {
             Image(monsterFrames[0], "Monster", Modifier.align(Alignment.CenterEnd).size(300.dp))
         }
         
-        // Foods Row (Left)
-        Column(Modifier.align(Alignment.CenterStart)) {
+        Column(Modifier.align(Alignment.CenterStart).padding(start = 20.dp)) {
             viewModel.foods.forEach { food ->
-                // DraggableFoodIcon(food, onDrop = { viewModel.onFed(food) })
-                Image(painterResource(food.resId), null, Modifier.size(80.dp).clickable { viewModel.onFed(food) })
+                Image(painterResource(food.resId), null, Modifier.size(100.dp).padding(10.dp).clickable { viewModel.onFed(food) })
             }
         }
         
-        // Home
         Image(painterResource(R.drawable.ui_button_home), "Home", Modifier.padding(16.dp).size(64.dp).clickable { onHome() })
     }
 }

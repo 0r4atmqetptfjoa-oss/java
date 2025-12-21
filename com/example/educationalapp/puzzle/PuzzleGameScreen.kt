@@ -1,29 +1,28 @@
 package com.example.educationalapp.puzzle
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -31,195 +30,139 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
-
-// Asigura-te ca ai acest fisier in pachetul 'com.example.educationalapp.puzzle'
 
 @Composable
-fun PuzzleGameScreen(onBack: () -> Unit) {
+fun PuzzleGameScreen(
+    viewModel: PuzzleViewModel = hiltViewModel(),
+    onBack: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val density = LocalDensity.current
 
-    // Dimensiuni piesa
-    val pieceSizeDp = 150.dp
-    val pieceSizePx = with(density) { pieceSizeDp.toPx() }
+    var boardOffset by remember { mutableStateOf(Offset.Zero) }
+    var boardSize by remember { mutableStateOf(androidx.compose.ui.geometry.Size.Zero) }
 
-    // State
-    var puzzleBitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var pieces by remember { mutableStateOf<List<PuzzlePieceState>>(emptyList()) }
-    var slots by remember { mutableStateOf<List<Offset>>(emptyList()) }
-    var rootPos by remember { mutableStateOf(Offset.Zero) }
-
-    // Load Image (Critical Fix: inScaled = false)
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            val opts = BitmapFactory.Options().apply { inScaled = false }
-            val bmp = BitmapFactory.decodeResource(context.resources, R.drawable.puzzle_image_full, opts)
-            puzzleBitmap = bmp
-        }
-    }
-
-    // Initialize Pieces ONLY when bitmap is ready
-    LaunchedEffect(puzzleBitmap) {
-        val bmp = puzzleBitmap ?: return@LaunchedEffect
-        // Split 2x2
-        val rows = 2
-        val cols = 2
-        val chunkW = bmp.width / cols
-        val chunkH = bmp.height / rows
+    Box(modifier = Modifier.fillMaxSize()) {
         
-        val newPieces = mutableListOf<PuzzlePieceState>()
-        var id = 0
-        for(r in 0 until rows) {
-            for(c in 0 until cols) {
-                val pieceBmp = Bitmap.createBitmap(bmp, c * chunkW, r * chunkH, chunkW, chunkH)
-                newPieces.add(
-                    PuzzlePieceState(
-                        id = id,
-                        bitmap = pieceBmp,
-                        correctRow = r,
-                        correctCol = c,
-                        initialX = 50f + (c * 20f), // Random scatter positions
-                        initialY = 400f + (r * 20f)
-                    )
-                )
-                id++
-            }
-        }
-        pieces = newPieces
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFE0F7FA))
-            .onGloballyPositioned { rootPos = it.positionInRoot() }
-    ) {
-        // Back Button
         Image(
-            painter = painterResource(id = R.drawable.ui_button_home),
-            contentDescription = "Back",
-            modifier = Modifier
-                .padding(16.dp)
-                .size(64.dp)
-                .clickable { onBack() }
+            painter = painterResource(id = R.drawable.bg_puzzle_table),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
 
-        if (pieces.isEmpty()) {
-            Text("Loading Puzzle...", modifier = Modifier.align(Alignment.Center))
-        } else {
-            // Drop Zones (Slots)
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 80.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).size(60.dp).zIndex(100f)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ui_btn_home),
+                contentDescription = "Back",
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(modifier = Modifier.fillMaxSize().clickable { onBack() })
+        }
+
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.weight(0.75f).fillMaxHeight().padding(16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Complete the Puzzle!", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF006064))
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                // 2x2 Grid container
-                Column {
-                    Row {
-                        PuzzleSlot(0, 0, pieceSizeDp) { slots = slots + it }
-                        PuzzleSlot(0, 1, pieceSizeDp) { slots = slots + it }
-                    }
-                    Row {
-                        PuzzleSlot(1, 0, pieceSizeDp) { slots = slots + it }
-                        PuzzleSlot(1, 1, pieceSizeDp) { slots = slots + it }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 60.dp, vertical = 20.dp) 
+                        .aspectRatio(4f/3f)
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .border(6.dp, Color(0xFF8D6E63), RoundedCornerShape(8.dp))
+                        .onGloballyPositioned { coordinates ->
+                            if (boardSize == androidx.compose.ui.geometry.Size.Zero) {
+                                boardSize = androidx.compose.ui.geometry.Size(
+                                    coordinates.size.width.toFloat(),
+                                    coordinates.size.height.toFloat()
+                                )
+                                boardOffset = coordinates.localToRoot(Offset.Zero)
+                                viewModel.startGame(context, boardSize.width, boardSize.height)
+                            }
+                        }
+                ) {
+                    if (uiState.currentThemeResId != 0) {
+                        Image(
+                            painter = painterResource(id = uiState.currentThemeResId),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().alpha(0.3f),
+                            contentScale = ContentScale.FillBounds
+                        )
                     }
                 }
             }
+            Box(modifier = Modifier.weight(0.25f).fillMaxHeight().background(Color.Black.copy(alpha = 0.3f)))
+        }
 
-            // Draggable Pieces
-            pieces.forEach { piece ->
-                DraggablePuzzlePiece(
-                    piece = piece,
-                    sizeDp = pieceSizeDp,
-                    slots = slots, // Trebuie sa trecem coordonatele slot-urilor calculate global sau local
-                    rootPos = rootPos,
-                    onPlaced = { /* Optional: Check win condition */ }
-                )
+        if (!uiState.isLoading && boardSize != androidx.compose.ui.geometry.Size.Zero) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                uiState.pieces.forEach { piece ->
+                    
+                    val pieceWidthDp = with(density) { piece.width.toDp() }
+                    val pieceHeightDp = with(density) { piece.height.toDp() }
+                    
+                    val elevation by animateDpAsState(targetValue = if (piece.isLocked) 0.dp else 10.dp)
+                    val zIndexPiece = if (piece.isLocked) 0f else 20f 
+
+                    val absoluteX = boardOffset.x + piece.currentX
+                    val absoluteY = boardOffset.y + piece.currentY
+
+                    Image(
+                        bitmap = piece.bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .offset { IntOffset(absoluteX.roundToInt(), absoluteY.roundToInt()) }
+                            .size(pieceWidthDp, pieceHeightDp)
+                            .zIndex(zIndexPiece)
+                            .shadow(elevation)
+                            .clip(PuzzleShape(piece.config)) 
+                            .pointerInput(piece.id, piece.isLocked) {
+                                if (!piece.isLocked) {
+                                    detectDragGestures(
+                                        onDragEnd = { viewModel.onPieceDrop(piece.id) }
+                                    ) { change, dragAmount ->
+                                        change.consume()
+                                        viewModel.onPieceDrag(piece.id, dragAmount.x, dragAmount.y)
+                                    }
+                                }
+                            }
+                    )
+                }
+            }
+        }
+
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Color.White)
+            }
+        }
+
+        if (uiState.isComplete) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.8f)).clickable {},
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("BRAVO!", color = Color.Green, fontSize = 60.sp, fontWeight = FontWeight.Black)
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = { boardSize = androidx.compose.ui.geometry.Size.Zero },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
+                    ) {
+                        Text("Joc Nou", fontSize = 24.sp, color = Color.White, modifier = Modifier.padding(10.dp))
+                    }
+                }
             }
         }
     }
-}
-
-@Composable
-fun PuzzleSlot(
-    row: Int, 
-    col: Int, 
-    sizeDp: androidx.compose.ui.unit.Dp,
-    onReportPos: (Offset) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .size(sizeDp)
-            .border(2.dp, Color.Gray.copy(alpha = 0.5f))
-            .background(Color.White.copy(alpha = 0.3f))
-            .onGloballyPositioned { 
-                // Aici ar trebui sa raportam pozitia absoluta catre parinte
-                // Dar pentru simplitate, in puzzle-ul simplu, calculam distanta in DraggablePiece
-            }
-    )
-}
-
-data class PuzzlePieceState(
-    val id: Int,
-    val bitmap: Bitmap,
-    val correctRow: Int,
-    val correctCol: Int,
-    val initialX: Float,
-    val initialY: Float
-)
-
-@Composable
-fun DraggablePuzzlePiece(
-    piece: PuzzlePieceState,
-    sizeDp: androidx.compose.ui.unit.Dp,
-    slots: List<Offset>, // Placeholder pt logica complexa
-    rootPos: Offset,
-    onPlaced: () -> Unit
-) {
-    val offsetX = remember { Animatable(piece.initialX, Float.VectorConverter) }
-    val offsetY = remember { Animatable(piece.initialY, Float.VectorConverter) }
-    val scope = rememberCoroutineScope()
-    var isDragging by remember { mutableStateOf(false) }
-
-    Image(
-        bitmap = piece.bitmap.asImageBitmap(),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = Modifier
-            .offset { IntOffset(offsetX.value.roundToInt(), offsetY.value.roundToInt()) }
-            .size(sizeDp)
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    isDragging = true
-                    val pointerId = down.id
-
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-                        if (!change.pressed) break
-                        
-                        val delta = change.positionChange()
-                        change.consume()
-                        
-                        scope.launch {
-                            offsetX.snapTo(offsetX.value + delta.x)
-                            offsetY.snapTo(offsetY.value + delta.y)
-                        }
-                    }
-                    isDragging = false
-                    // Snap logic here if needed (verificare distanta fata de slotul corect)
-                }
-            }
-    )
 }

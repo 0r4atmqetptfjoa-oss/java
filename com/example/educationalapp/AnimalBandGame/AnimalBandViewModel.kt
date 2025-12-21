@@ -22,7 +22,7 @@ enum class BandHitQuality(val label: String, val color: Color) {
 @HiltViewModel
 class AnimalBandViewModel @Inject constructor() : ViewModel() {
 
-    // --- State ---
+    // Stare
     var frogPlaying by mutableStateOf(false)
     var bearPlaying by mutableStateOf(false)
     var catPlaying by mutableStateOf(false)
@@ -34,12 +34,6 @@ class AnimalBandViewModel @Inject constructor() : ViewModel() {
     var jam by mutableStateOf(0f)
     var isFinalJam by mutableStateOf(false)
 
-    // Hit feedback state
-    var lastHitQuality by mutableStateOf(BandHitQuality.NONE)
-    var lastHitMusician by mutableStateOf<MusicianId?>(null)
-    var lastHitTime by mutableStateOf(0L)
-
-    // Config
     private val bpm = 120f
     val beatPeriodNanos = (60_000_000_000f / bpm).toLong().coerceAtLeast(1L)
 
@@ -66,7 +60,7 @@ class AnimalBandViewModel @Inject constructor() : ViewModel() {
         val distToBeat = min(phase, 1.0 - phase) * beatPeriodNanos.toDouble()
         val distMs = distToBeat / 1_000_000.0
         return when {
-            distMs <= 70.0 -> BandHitQuality.PERFECT // Putin mai iertator
+            distMs <= 70.0 -> BandHitQuality.PERFECT
             distMs <= 150.0 -> BandHitQuality.GOOD
             else -> BandHitQuality.MISS
         }
@@ -74,11 +68,7 @@ class AnimalBandViewModel @Inject constructor() : ViewModel() {
 
     fun onMusicianClick(id: MusicianId, nowNanos: Long) {
         val quality = evaluateHit(nowNanos)
-        lastHitQuality = quality
-        lastHitMusician = id
-        lastHitTime = System.nanoTime() // Folosim system time pt UI feedback transient
-
-        // Logic combo & jam
+        
         when (id) {
             MusicianId.FROG -> {
                 if (!frogPlaying) frogPlaying = true
@@ -94,7 +84,6 @@ class AnimalBandViewModel @Inject constructor() : ViewModel() {
             }
         }
         
-        // Update Jam Meter
         val boost = if(quality == BandHitQuality.PERFECT) 0.05f else 0.02f
         jam = (jam + boost * synergyMultiplier()).coerceIn(0f, 1f)
     }
@@ -113,10 +102,5 @@ class AnimalBandViewModel @Inject constructor() : ViewModel() {
             MusicianId.BEAR -> bearPlaying = !bearPlaying
             MusicianId.CAT -> catPlaying = !catPlaying
         }
-    }
-    
-    fun resetJam() {
-        jam = 0f
-        isFinalJam = false
     }
 }

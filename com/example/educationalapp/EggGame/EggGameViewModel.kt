@@ -17,7 +17,6 @@ class EggGameViewModel @Inject constructor() : ViewModel() {
     var hatchProgress by mutableStateOf(0f)
     var dragonMode by mutableStateOf(DragonAnim.IDLE)
     
-    // Beat logic identical to Band
     private val bpm = 120f
     val beatPeriodNanos = (60_000_000_000f / bpm).toLong()
 
@@ -27,12 +26,11 @@ class EggGameViewModel @Inject constructor() : ViewModel() {
             return
         }
         
-        // Beat check logic
         val phase = (nowNanos % beatPeriodNanos).toDouble() / beatPeriodNanos
         val dist = min(phase, 1.0 - phase)
-        val isHit = dist < 0.2 // Toleranta
+        val isHit = dist < 0.2
         
-        if (isHit) {
+        if (isHit || nowNanos == 0L) { // 0L pt debug/click simplu
             hatchProgress += 0.15f
             updateState()
         }
@@ -41,17 +39,11 @@ class EggGameViewModel @Inject constructor() : ViewModel() {
     private fun updateState() {
         gameState = when {
             hatchProgress >= 1f -> EggState.DRAGON
-            hatchProgress >= 0.6f -> EggState.BROKEN // Almost
+            hatchProgress >= 0.6f -> EggState.BROKEN 
             hatchProgress >= 0.3f -> EggState.CRACK2
             hatchProgress >= 0.1f -> EggState.CRACK1
             else -> EggState.INTACT
         }
         if (gameState == EggState.DRAGON) dragonMode = DragonAnim.RISE
-    }
-    
-    fun reset() {
-        gameState = EggState.INTACT
-        hatchProgress = 0f
-        dragonMode = DragonAnim.IDLE
     }
 }
