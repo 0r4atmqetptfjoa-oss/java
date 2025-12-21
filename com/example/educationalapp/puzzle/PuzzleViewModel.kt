@@ -16,10 +16,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
-import kotlin.math.abs
+import kotlin.math.hypot
+import kotlin.math.max
 import kotlin.math.min
 
 data class PuzzlePiece(
@@ -32,311 +34,323 @@ data class PuzzlePiece(
     val isLocked: Boolean = false,
     val width: Int,
     val height: Int,
-    val config: PieceConfig
+    val config: PieceConfig,
+    val z: Int = 0
 )
+
+sealed class PuzzleEvent {
+    data class Snap(val pieceId: Int) : PuzzleEvent()
+    object Completed : PuzzleEvent()
+}
 
 data class PuzzleUiState(
     val pieces: List<PuzzlePiece> = emptyList(),
     val currentThemeResId: Int = 0,
     val isLoading: Boolean = true,
-    val isComplete: Boolean = false
+    val isComplete: Boolean = false,
+    val snapDistancePx: Float = 0f,
+    val magnetDistancePx: Float = 0f,
+    val event: PuzzleEvent? = null
 )
 
 @HiltViewModel
 class PuzzleViewModel @Inject constructor() : ViewModel() {
 
-    companion object {
-        // Cerință: jocul rulează strict pe 4x4.
-        private const val ROWS = 4
-        private const val COLS = 4
-
-        // „Magnet” (ajutor) - folosit doar în apropierea poziției corecte.
-        private const val MAGNET_STRENGTH = 0.22f
-    }
-
     private val _uiState = MutableStateFlow(PuzzleUiState())
-    val uiState: StateFlow<PuzzleUiState> = _uiState
+    val uiState: StateFlow<PuzzleUiState> = _uiState.asStateFlow()
 
-    // Used to keep pieces inside reasonable bounds (so they cannot be "lost" off-screen).
+    // Board size in px (board box only, not the HUD area)
     private var boardW: Float = 0f
     private var boardH: Float = 0f
+
+    private var zCounter: Int = 0
+
+    fun consumeEvent() {
+        _uiState.value = _uiState.value.copy(event = null)
+    }
 
     fun startGame(context: Context, boardWidth: Float, boardHeight: Float) {
         boardW = boardWidth
         boardH = boardHeight
 
+        val rows = 4
+        val cols = 4
+
+        // Adaptive snap/magnet distances based on cell size
+        val cellW = boardWidth / cols.toFloat()
+        val cellH = boardHeight / rows.toFloat()
+        val snap = min(cellW, cellH) * 0.22f
+        val magnet = snap * 2.2f
+
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, isComplete = false)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                isComplete = false,
+                event = null,
+                snapDistancePx = snap,
+                magnetDistancePx = magnet
+            )
 
             val theme = PuzzleAssets.getRandomTheme()
-            val pieces = cutBitmapPremium(
+            val pieces = cutBitmapUnified(
                 context = context,
                 resId = theme.resId,
-                rows = ROWS,
-                cols = COLS,
-                boardWidth = boardWidth,
-                boardHeight = boardHeight
+                rows = rows,
+                cols = cols,
+                reqW = boardWidth,
+                reqH = boardHeight
             )
 
-            _uiState.value = PuzzleUiState(
+            _uiState.value = _uiState.value.copy(
                 pieces = pieces,
                 currentThemeResId = theme.resId,
-                isLoading = false,
-                isComplete = false
+                isLoading = false
             )
         }
     }
 
-    /**
-     * Reorders the list so that the dragged piece is rendered last (on top).
-     */
-    fun bringToFront(pieceId: Int) {
-        val list = _uiState.value.pieces
-        val idx = list.indexOfFirst { it.id == pieceId }
-        if (idx <= -1) return
-        val piece = list[idx]
-        if (piece.isLocked) return
-
-        val newList = list.toMutableList().apply {
-            removeAt(idx)
-            add(piece)
-        }
-        _uiState.value = _uiState.value.copy(pieces = newList)
-    }
-
-    fun onPieceDrag(pieceId: Int, dragAmountX: Float, dragAmountY: Float) {
+    fun onPieceDragStart(pieceId: Int) {
         val currentList = _uiState.value.pieces.toMutableList()
-        val index = currentList.indexOfFirst { it.id == pieceId }
-        if (index == -1) return
-
-        val piece = currentList[index]
+        val idx = currentList.indexOfFirst { it.id == pieceId }
+        if (idx == -1) return
+        val piece = currentList[idx]
         if (piece.isLocked) return
 
-        var nextX = piece.currentX + dragAmountX
-        var nextY = piece.currentY + dragAmountY
-
-        // Magnet assist: dacă ești aproape de target, trage ușor spre poziția corectă.
-        val magnetDistance = (min(piece.width, piece.height) * 0.28f).coerceIn(38f, 180f)
-        val dxToTarget = piece.targetX - nextX
-        val dyToTarget = piece.targetY - nextY
-        if (abs(dxToTarget) < magnetDistance && abs(dyToTarget) < magnetDistance) {
-            nextX += dxToTarget * MAGNET_STRENGTH
-            nextY += dyToTarget * MAGNET_STRENGTH
-        }
-
-        // Keep pieces inside a forgiving rectangle around the board (still allows moving to the tray).
-        val minX = -piece.width * 0.65f
-        val maxX = boardW + piece.width * 1.85f
-        val minY = -piece.height * 0.70f
-        val maxY = boardH + piece.height * 0.75f
-
-        currentList[index] = piece.copy(
-            currentX = nextX.coerceIn(minX, maxX),
-            currentY = nextY.coerceIn(minY, maxY)
-        )
-
+        zCounter += 1
+        currentList[idx] = piece.copy(z = zCounter)
         _uiState.value = _uiState.value.copy(pieces = currentList)
     }
 
-    fun onPieceDrop(pieceId: Int) {
-        val currentList = _uiState.value.pieces.toMutableList()
-        val index = currentList.indexOfFirst { it.id == pieceId }
-        if (index == -1) return
-
-        val piece = currentList[index]
+    fun onPieceDrag(pieceId: Int, dragAmountX: Float, dragAmountY: Float) {
+        val state = _uiState.value
+        val currentList = state.pieces.toMutableList()
+        val idx = currentList.indexOfFirst { it.id == pieceId }
+        if (idx == -1) return
+        val piece = currentList[idx]
         if (piece.isLocked) return
 
-        // Adaptive snap distance: scales with piece size + clamps to sane limits.
-        val snapDistance = (min(piece.width, piece.height) * 0.16f).coerceIn(24f, 96f)
+        // Apply movement
+        var nx = piece.currentX + dragAmountX
+        var ny = piece.currentY + dragAmountY
 
-        val dx = abs(piece.currentX - piece.targetX)
-        val dy = abs(piece.currentY - piece.targetY)
+        // Soft clamp so pieces don't get lost
+        val minX = -piece.width * 0.35f
+        val maxX = boardW + piece.width * 0.85f
+        val minY = -piece.height * 0.15f
+        val maxY = boardH - piece.height * 0.10f
+        nx = nx.coerceIn(minX, maxX)
+        ny = ny.coerceIn(minY, maxY)
 
-        if (dx < snapDistance && dy < snapDistance) {
-            currentList[index] = piece.copy(
+        // Magnet assist if close to target
+        val magnetDist = state.magnetDistancePx
+        if (magnetDist > 0f) {
+            val dx = piece.targetX - nx
+            val dy = piece.targetY - ny
+            val d = hypot(dx, dy)
+            if (d < magnetDist) {
+                val t = ((magnetDist - d) / magnetDist).coerceIn(0f, 1f)
+                val strength = 0.35f * t * t // up to 35% pull
+                nx = nx + dx * strength
+                ny = ny + dy * strength
+            }
+        }
+
+        currentList[idx] = piece.copy(currentX = nx, currentY = ny)
+        _uiState.value = state.copy(pieces = currentList)
+    }
+
+    fun onPieceDrop(pieceId: Int) {
+        val state = _uiState.value
+        val currentList = state.pieces.toMutableList()
+        val idx = currentList.indexOfFirst { it.id == pieceId }
+        if (idx == -1) return
+        val piece = currentList[idx]
+        if (piece.isLocked) return
+
+        val snapDist = state.snapDistancePx
+        val dx = piece.targetX - piece.currentX
+        val dy = piece.targetY - piece.currentY
+        val dist = hypot(dx, dy)
+
+        if (snapDist > 0f && dist <= snapDist) {
+            currentList[idx] = piece.copy(
                 currentX = piece.targetX,
                 currentY = piece.targetY,
                 isLocked = true
             )
-            _uiState.value = _uiState.value.copy(pieces = currentList)
-            checkVictory()
+
+            var newState = state.copy(pieces = currentList, event = PuzzleEvent.Snap(pieceId))
+
+            if (currentList.all { it.isLocked }) {
+                newState = newState.copy(isComplete = true, event = PuzzleEvent.Completed)
+            }
+
+            _uiState.value = newState
         } else {
-            _uiState.value = _uiState.value.copy(pieces = currentList)
+            _uiState.value = state.copy(pieces = currentList)
         }
     }
 
-    private fun checkVictory() {
-        val completed = _uiState.value.pieces.all { it.isLocked }
-        if (completed) {
-            _uiState.value = _uiState.value.copy(isComplete = true)
-        }
-    }
-
-    /**
-     * Premium cutter:
-     * - 4x4 fixed
-     * - Bitmap mask (anti-aliased) aplicat direct pe piesă
-     * - Contur subtil (stroke) pentru look "puzzle real"
-     */
-    private suspend fun cutBitmapPremium(
+    // --- UNIFIED CUT + PREMIUM MASK (4x4) ---
+    private suspend fun cutBitmapUnified(
         context: Context,
         resId: Int,
         rows: Int,
         cols: Int,
-        boardWidth: Float,
-        boardHeight: Float
-    ): List<PuzzlePiece> = withContext(Dispatchers.Default) {
+        reqW: Float,
+        reqH: Float
+    ): List<PuzzlePiece> = withContext(Dispatchers.IO) {
 
-        val options = BitmapFactory.Options().apply {
-            inPreferredConfig = Bitmap.Config.ARGB_8888
-        }
-        val loadedBitmap = BitmapFactory.decodeResource(context.resources, resId, options)
-            ?: throw IllegalStateException("Failed to decode puzzle image resId=$resId")
+        // 1) Load (downsample for memory)
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeResource(context.resources, resId, bounds)
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > 1400) sampleSize *= 2
 
-        // Scale the image to match the board size (in px).
+        val loadOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val loadedBitmap = BitmapFactory.decodeResource(context.resources, resId, loadOptions)
+            ?: return@withContext emptyList()
+
         val scaledBitmap = Bitmap.createScaledBitmap(
             loadedBitmap,
-            boardWidth.toInt().coerceAtLeast(1),
-            boardHeight.toInt().coerceAtLeast(1),
+            reqW.toInt().coerceAtLeast(1),
+            reqH.toInt().coerceAtLeast(1),
             true
         )
-
-        // Free original bitmap to reduce peak memory.
-        if (loadedBitmap != scaledBitmap && !loadedBitmap.isRecycled) {
+        if (loadedBitmap !== scaledBitmap) {
             loadedBitmap.recycle()
         }
 
-        val reqW = scaledBitmap.width
-        val reqH = scaledBitmap.height
+        val pieces = mutableListOf<PuzzlePiece>()
 
         val baseW = reqW / cols
         val baseH = reqH / rows
 
-        // Padding is 1/3 of the base size. Matches PuzzleShape math (base = 3/5 of full).
-        val paddingX = baseW / 3
-        val paddingY = baseH / 3
+        val paddingX = baseW / 3f
+        val paddingY = baseH / 3f
 
-        val fullPieceW = baseW + 2 * paddingX
-        val fullPieceH = baseH + 2 * paddingY
+        val fullPieceW = (baseW + 2f * paddingX).toInt().coerceAtLeast(1)
+        val fullPieceH = (baseH + 2f * paddingY).toInt().coerceAtLeast(1)
 
-        // Generate edge configs (matching knobs/holes between adjacent pieces).
-        val pieceConfigs = Array(rows) { Array(cols) { PieceConfig(0, 0, 0, 0) } }
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val top = if (r == 0) 0 else -pieceConfigs[r - 1][c].bottom
-                val left = if (c == 0) 0 else -pieceConfigs[r][c - 1].right
-                val bottom = if (r == rows - 1) 0 else if (Math.random() < 0.5) 1 else -1
-                val right = if (c == cols - 1) 0 else if (Math.random() < 0.5) 1 else -1
-                pieceConfigs[r][c] = PieceConfig(top, right, bottom, left)
-            }
+        // Random edges
+        val horizontalEdges = Array(rows - 1) { IntArray(cols) }
+        val verticalEdges = Array(rows) { IntArray(cols - 1) }
+
+        for (r in 0 until rows - 1) for (c in 0 until cols) horizontalEdges[r][c] = if (Math.random() > 0.5) 1 else -1
+        for (r in 0 until rows) for (c in 0 until cols - 1) verticalEdges[r][c] = if (Math.random() > 0.5) 1 else -1
+
+        // Place initial pieces slightly to the right of the board (within same coordinate system)
+        val trayStartX = reqW + max(24f, reqW * 0.08f)
+
+        // Paint for bitmap draw
+        val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
         }
 
-        // Paint for drawing the image region (filtered, anti-aliased).
-        val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-
-        // Mask + outline paints.
-        val maskFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // Mask paint (DST_IN)
+        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.FILL
-            color = 0xFFFFFFFF.toInt()
-        }
-        val maskXferPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
         }
 
-        val outlineStroke = (min(fullPieceW, fullPieceH) * 0.012f).coerceIn(1.5f, 4.0f)
-        val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        // Stroke paint (border)
+        val strokeW = max(2f, min(fullPieceW, fullPieceH) * 0.012f)
+        val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
-            strokeWidth = outlineStroke
-            color = 0xAAFFFFFF.toInt()
-        }
-        val outlineShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = outlineStroke + 0.8f
-            color = 0x55000000
+            strokeWidth = strokeW
+            color = 0x66FFFFFF
         }
 
-        val pieces = mutableListOf<PuzzlePiece>()
         var idCounter = 0
+        zCounter = 0
 
-        // Tray area: start to the right of the board.
-        val trayStartX = reqW + 55f
-        val maxStartY = (reqH - fullPieceH).toFloat().coerceAtLeast(0f)
+        for (row in 0 until rows) {
+            for (col in 0 until cols) {
 
-        for (r in 0 until rows) {
-            for (c in 0 until cols) {
-                val x = c * baseW - paddingX
-                val y = r * baseH - paddingY
-
-                val srcRect = Rect(
-                    x.coerceAtLeast(0),
-                    y.coerceAtLeast(0),
-                    (x + fullPieceW).coerceAtMost(reqW),
-                    (y + fullPieceH).coerceAtMost(reqH)
-                )
+                val top = if (row == 0) 0 else -horizontalEdges[row - 1][col]
+                val bottom = if (row == rows - 1) 0 else horizontalEdges[row][col]
+                val left = if (col == 0) 0 else -verticalEdges[row][col - 1]
+                val right = if (col == cols - 1) 0 else verticalEdges[row][col]
+                val config = PieceConfig(top, right, bottom, left)
 
                 val pieceBitmap = Bitmap.createBitmap(fullPieceW, fullPieceH, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(pieceBitmap)
 
-                val dstRect = Rect(
-                    srcRect.left - x,
-                    srcRect.top - y,
-                    srcRect.left - x + srcRect.width(),
-                    srcRect.top - y + srcRect.height()
-                )
+                val logicalX = col * baseW
+                val logicalY = row * baseH
 
-                // 1) Draw the image region.
-                canvas.drawBitmap(scaledBitmap, srcRect, dstRect, imagePaint)
+                // source rect in scaled image
+                val srcLeft = (logicalX - paddingX).toInt()
+                val srcTop = (logicalY - paddingY).toInt()
+                val srcRight = (logicalX + baseW + paddingX).toInt()
+                val srcBottom = (logicalY + baseH + paddingY).toInt()
 
-                // 2) Apply mask in bitmap (anti-aliased shape).
-                val config = pieceConfigs[r][c]
+                var finalSrcLeft = srcLeft
+                var finalSrcTop = srcTop
+                var finalSrcRight = srcRight
+                var finalSrcBottom = srcBottom
+
+                var dstLeft = 0
+                var dstTop = 0
+                var dstRight = fullPieceW
+                var dstBottom = fullPieceH
+
+                if (srcLeft < 0) {
+                    dstLeft += -srcLeft
+                    finalSrcLeft = 0
+                }
+                if (srcTop < 0) {
+                    dstTop += -srcTop
+                    finalSrcTop = 0
+                }
+                if (srcRight > scaledBitmap.width) {
+                    dstRight -= (srcRight - scaledBitmap.width)
+                    finalSrcRight = scaledBitmap.width
+                }
+                if (srcBottom > scaledBitmap.height) {
+                    dstBottom -= (srcBottom - scaledBitmap.height)
+                    finalSrcBottom = scaledBitmap.height
+                }
+
+                val srcRect = Rect(finalSrcLeft, finalSrcTop, finalSrcRight, finalSrcBottom)
+                val dstRect = Rect(dstLeft, dstTop, dstRight, dstBottom)
+
+                canvas.drawBitmap(scaledBitmap, srcRect, dstRect, bitmapPaint)
+
+                // Premium: apply mask directly in bitmap + outline
                 val maskPath = PuzzleShape.createAndroidPath(config, fullPieceW.toFloat(), fullPieceH.toFloat())
+                canvas.drawPath(maskPath, maskPaint)
+                maskPaint.xfermode = null
+                canvas.drawPath(maskPath, strokePaint)
+                maskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
 
-                val maskBitmap = Bitmap.createBitmap(fullPieceW, fullPieceH, Bitmap.Config.ARGB_8888)
-                Canvas(maskBitmap).drawPath(maskPath, maskFillPaint)
-                canvas.drawBitmap(maskBitmap, 0f, 0f, maskXferPaint)
-                maskBitmap.recycle()
+                // Target in board coords (includes padding offset)
+                val targetX = logicalX - paddingX
+                val targetY = logicalY - paddingY
 
-                // Clear Xfermode to avoid side effects.
-                maskXferPaint.xfermode = null
+                val startX = trayStartX + (Math.random().toFloat() * max(20f, reqW * 0.08f))
+                val startY = (Math.random().toFloat() * max(1f, reqH - fullPieceH.toFloat()))
 
-                // 3) Outline for a more "real" puzzle look.
-                canvas.drawPath(maskPath, outlineShadowPaint)
-                canvas.drawPath(maskPath, outlinePaint)
-
-                // Restore xfermode for next piece.
-                maskXferPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-
-                // Target (top-left of the full bitmap) is logical position minus padding.
-                val logicalX = c * baseW
-                val logicalY = r * baseH
-
-                val randomOffsetX = (Math.random() * 220 - 110).toFloat()
-                val randomOffsetY = (Math.random() * 220 - 110).toFloat()
-
-                val startX = trayStartX + randomOffsetX
-                val startY = (Math.random().toFloat() * maxStartY) + randomOffsetY
-
+                zCounter += 1
                 pieces.add(
                     PuzzlePiece(
                         id = idCounter++,
                         bitmap = pieceBitmap.asImageBitmap(),
                         currentX = startX,
                         currentY = startY,
-                        targetX = (logicalX - paddingX).toFloat(),
-                        targetY = (logicalY - paddingY).toFloat(),
+                        targetX = targetX,
+                        targetY = targetY,
                         isLocked = false,
                         width = fullPieceW,
                         height = fullPieceH,
-                        config = config
+                        config = config,
+                        z = zCounter
                     )
                 )
             }
         }
 
-        if (!scaledBitmap.isRecycled) {
-            scaledBitmap.recycle()
-        }
-
-        pieces.shuffled()
+        scaledBitmap.recycle()
+        return@withContext pieces.shuffled()
     }
 }
