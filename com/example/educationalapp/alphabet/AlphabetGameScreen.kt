@@ -606,6 +606,9 @@ private fun FinishPanel(
     total: Int,
     onReplay: () -> Unit
 ) {
+    // Local responsive flag for this composable (it is not in scope from the parent).
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Surface(
         shape = RoundedCornerShape(22.dp),
         color = Color.White.copy(alpha = 0.92f),
