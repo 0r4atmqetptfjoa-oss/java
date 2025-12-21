@@ -20,7 +20,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -31,7 +30,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -415,23 +416,22 @@ private fun SpriteSheetActor(
     val idx1 = idxFor(i0 + 1)
 
     Canvas(modifier = modifier) {
-        val dst = IntSize(size.width.roundToInt(), size.height.roundToInt()).let {
-            IntSize(it.width.coerceAtLeast(1), it.height.coerceAtLeast(1))
-        }
-
         fun drawFrame(index: Int, alpha: Float) {
             val col = index % spec.cols
             val row = index / spec.cols
             val srcOffset = IntOffset(col * frameW, row * frameH)
             val srcSize = IntSize(frameW, frameH)
-            drawImageRect(
-                image = sheet,
-                srcOffset = srcOffset,
-                srcSize = srcSize,
-                dstSize = dst,
-                alpha = alpha.coerceIn(0f, 1f),
-                filterQuality = FilterQuality.High
-            )
+            val dstOffset = IntOffset(0, 0)
+            val dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt())
+
+            // Compat: folosim Canvas.drawImageRect(...) cu offset/size (disponibil în versiuni mai vechi Compose)
+            drawIntoCanvas { canvas ->
+                val p = Paint().apply {
+                    this.alpha = alpha.coerceIn(0f, 1f)
+                    this.filterQuality = FilterQuality.High
+                }
+                canvas.drawImageRect(sheet, srcOffset, srcSize, dstOffset, dstSize, p)
+            }
         }
 
         // Crossfade: frame0 -> frame1
