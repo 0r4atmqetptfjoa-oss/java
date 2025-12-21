@@ -258,7 +258,7 @@ class PuzzleViewModel @Inject constructor() : ViewModel() {
         val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = strokeW
-            color = 0x99FFFFFF
+            color = 0x99FFFFFF.toInt()
         }
 
 
