@@ -123,7 +123,7 @@ fun AlphabetGameScreen(
                     onToggleSound = {
                         if (uiState.soundOn) soundPlayer.playClick()
                         viewModel.toggleSound()
-                        if (!uiState.soundOn) soundPlayer.playClick() // play after toggle on
+                        if (!uiState.soundOn) soundPlayer.playClick()
                     },
                     onHome = { soundPlayer.playClick(); onBackToMenu() }
                 )
@@ -196,13 +196,14 @@ fun AlphabetGameScreen(
                                 }
                             }
 
-                            // --- AICI ERA EROAREA ---
+                            // --- MODIFICAREA ESTE AICI ---
+                            // Am dat un nume explicit (rightBox) scope-ului
                             BoxWithConstraints(
                                 modifier = Modifier.weight(0.32f).fillMaxHeight()
-                            ) {
-                                // REPARATIE: Folosim 'this.maxWidth' și 'this.maxHeight' explicit
-                                val rightW = this.maxWidth
-                                val rightH = this.maxHeight
+                            ) { rightBox -> 
+                            
+                                val rightW = rightBox.maxWidth
+                                val rightH = rightBox.maxHeight
 
                                 val mascotSize = (rightH * 0.44f).coerceIn(120.dp, 230.dp)
                                 val reservedForMascot = (mascotSize * 0.82f).coerceIn(110.dp, 200.dp)
@@ -297,10 +298,7 @@ fun AlphabetGameScreen(
     }
 }
 
-// RESTUL COMPONENTELOR (HeaderBar, FinishPanel, SquishyButton, Confetti) RĂMÂN NESCHIMBATE
-// PENTRU A ECONOMISI SPAȚIU, LE POȚI LĂSA AȘA CUM ERAU IN FIȘIERUL PRECEDENT.
-// DOAR ASIGURĂ-TE CĂ COPIEZI TOT FIȘIERUL DACĂ IL ÎNLOCUIEȘTI COMPLET.
-
+// COMPONENTS (HeaderBar, FinishPanel, SquishyButton, Confetti)
 @Composable
 private fun HeaderBar(score: Int, stars: Int, questionIndex: Int, totalQuestions: Int, attemptsLeft: Int, soundOn: Boolean, onToggleSound: () -> Unit, onHome: () -> Unit) {
     val progress = if (totalQuestions > 0) (questionIndex + 1) / totalQuestions.toFloat() else 0f

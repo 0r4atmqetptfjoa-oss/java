@@ -48,12 +48,11 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
         val totalQuestions = min(10, AlphabetAssets.items.size.coerceAtLeast(1))
         questionDeck = buildDeck(totalQuestions)
 
-        // REPARATIE: Folosim argumente numite pentru a evita confuzia de tipuri si ordinea lor
         val firstItem = if (questionDeck.isNotEmpty()) {
             questionDeck[0]
         } else {
-            // Aici era eroarea. Acum specificăm clar fiecare parametru.
-            AlphabetItem(displayLetter = "A", word = "Albină", imageRes = 0)
+            // AICI: Am adăugat `baseLetter`
+            AlphabetItem(displayLetter = "A", baseLetter = "A", word = "Albină", imageRes = 0)
         }
         
         val (q, opts) = if (questionDeck.isNotEmpty()) generateQuestion(0) else (firstItem to listOf("A", "B", "C"))
@@ -73,8 +72,8 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
 
     private fun generateQuestion(questionIndex: Int): Pair<AlphabetItem, List<String>> {
         if (questionDeck.isEmpty()) {
-            // REPARATIE: Argumente numite si aici
-            return AlphabetItem(displayLetter = "?", word = "Error", imageRes = 0) to emptyList()
+            // AICI: Am adăugat `baseLetter`
+            return AlphabetItem(displayLetter = "?", baseLetter = "?", word = "Error", imageRes = 0) to emptyList()
         }
         
         val current = questionDeck[questionIndex.coerceIn(questionDeck.indices)]
