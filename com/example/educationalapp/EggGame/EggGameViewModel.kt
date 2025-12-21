@@ -1,49 +1,67 @@
 package com.example.educationalapp.EggGame
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlin.math.min
-
-enum class EggState { INTACT, CRACK1, CRACK2, BROKEN, DRAGON }
-enum class DragonAnim { IDLE, RISE, CELEBRATE }
 
 @HiltViewModel
 class EggGameViewModel @Inject constructor() : ViewModel() {
-    var gameState by mutableStateOf(EggState.INTACT)
-    var hatchProgress by mutableStateOf(0f)
-    var dragonMode by mutableStateOf(DragonAnim.IDLE)
-    
-    private val bpm = 120f
-    val beatPeriodNanos = (60_000_000_000f / bpm).toLong()
 
-    fun onTapEgg(nowNanos: Long) {
-        if (gameState == EggState.DRAGON) {
-            dragonMode = DragonAnim.CELEBRATE
-            return
-        }
-        
-        val phase = (nowNanos % beatPeriodNanos).toDouble() / beatPeriodNanos
-        val dist = min(phase, 1.0 - phase)
-        val isHit = dist < 0.2
-        
-        if (isHit || nowNanos == 0L) { // 0L pt debug/click simplu
-            hatchProgress += 0.15f
-            updateState()
+    var eggState by mutableStateOf(EggState.INTACT)
+        private set
+
+    var dragonAnim by mutableStateOf(DragonAnim.IDLE)
+        private set
+
+    /** crește ca "event counter" pentru UI (LaunchedEffect) */
+    var crackEvent by mutableIntStateOf(0)
+        private set
+
+    /** 1=crack1, 2=crack2, 3=broken/burst */
+    var crackLevel by mutableIntStateOf(0)
+        private set
+
+    fun onEggTap() {
+        when (eggState) {
+            EggState.INTACT -> {
+                eggState = EggState.CRACK1
+                crackLevel = 1
+                crackEvent++
+            }
+            EggState.CRACK1 -> {
+                eggState = EggState.CRACK2
+                crackLevel = 2
+                crackEvent++
+            }
+            EggState.CRACK2 -> {
+                eggState = EggState.BROKEN
+                crackLevel = 3
+                crackEvent++
+            }
+            EggState.BROKEN -> {
+                eggState = EggState.DRAGON
+                dragonAnim = DragonAnim.IDLE
+            }
+            EggState.DRAGON -> {
+                // daca apasa oul cand e deja dragon, trecem pe hop
+                dragonAnim = DragonAnim.HOP
+            }
         }
     }
-    
-    private fun updateState() {
-        gameState = when {
-            hatchProgress >= 1f -> EggState.DRAGON
-            hatchProgress >= 0.6f -> EggState.BROKEN 
-            hatchProgress >= 0.3f -> EggState.CRACK2
-            hatchProgress >= 0.1f -> EggState.CRACK1
-            else -> EggState.INTACT
+
+    fun onDragonTap() {
+        if (eggState == EggState.DRAGON) {
+            dragonAnim = DragonAnim.HOP
         }
-        if (gameState == EggState.DRAGON) dragonMode = DragonAnim.RISE
+    }
+
+    fun onHopFinished() {
+        if (eggState == EggState.DRAGON && dragonAnim == DragonAnim.HOP) {
+            dragonAnim = DragonAnim.IDLE
+        }
     }
 }

@@ -1,6 +1,7 @@
 package com.example.educationalapp.FeedGame
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -12,29 +13,32 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class FoodItem(val id: Int, val resId: Int, val isHealthy: Boolean)
-
 @HiltViewModel
 class FeedGameViewModel @Inject constructor() : ViewModel() {
 
-    companion object {
-        const val STATE_IDLE = "IDLE"
-        const val STATE_EATING = "EATING"
-    }
-
-    var score by mutableStateOf(0)
+    var score by mutableIntStateOf(0)
         private set
 
-    var monsterState by mutableStateOf(STATE_IDLE)
+    var monsterState by mutableStateOf(MonsterState.IDLE)
         private set
 
     var wantedFood by mutableStateOf<FoodItem?>(null)
         private set
 
-    val foods = listOf(
-        FoodItem(1, R.drawable.food_apple, true),
-        FoodItem(2, R.drawable.food_cookie, false),
-        FoodItem(3, R.drawable.food_broccoli, true)
+    /** crește ca event counter pentru UI (VFX) */
+    var feedEvent by mutableIntStateOf(0)
+        private set
+
+    /** dacă ultimul feed a fost corect (pentru VFX / UI) */
+    var lastFeedCorrect by mutableStateOf(false)
+        private set
+
+    val foods: List<FoodItem> = listOf(
+        FoodItem(1, R.drawable.food_apple, "Apple", true),
+        FoodItem(2, R.drawable.food_broccoli, "Broccoli", true),
+        FoodItem(3, R.drawable.food_fish, "Fish", true),
+        FoodItem(4, R.drawable.food_cookie, "Cookie", false),
+        FoodItem(5, R.drawable.food_donut, "Donut", false),
     )
 
     private var eatJob: Job? = null
@@ -48,19 +52,27 @@ class FeedGameViewModel @Inject constructor() : ViewModel() {
     }
 
     fun onFed(food: FoodItem) {
-        if (food == wantedFood) {
+        val wanted = wantedFood
+        val correct = (wanted != null && food.id == wanted.id)
+
+        lastFeedCorrect = correct
+        if (correct) {
             score += 10
-            triggerEating()
+        } else {
+            score = (score - 2).coerceAtLeast(0)
         }
+
+        triggerEating()
         pickNewWish()
+        feedEvent++
     }
 
     private fun triggerEating() {
-        monsterState = STATE_EATING
+        monsterState = MonsterState.EATING
         eatJob?.cancel()
         eatJob = viewModelScope.launch {
-            delay(900) // revine automat la idle
-            monsterState = STATE_IDLE
+            delay(900)
+            monsterState = MonsterState.IDLE
         }
     }
 }

@@ -1,106 +1,106 @@
 package com.example.educationalapp.AnimalBandGame
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlin.math.min
-
-enum class MusicianId { FROG, BEAR, CAT }
-
-enum class BandHitQuality(val label: String, val color: Color) {
-    PERFECT("Perfect", Color(0xFF00E5FF)),
-    GOOD("Good", Color(0xFFFFEB3B)),
-    MISS("Miss", Color(0xFFFF5252)),
-    NONE("", Color.Transparent)
-}
+import kotlin.math.roundToLong
 
 @HiltViewModel
 class AnimalBandViewModel @Inject constructor() : ViewModel() {
 
-    // Stare
-    var frogPlaying by mutableStateOf(false)
-    var bearPlaying by mutableStateOf(false)
-    var catPlaying by mutableStateOf(false)
+    // BPM & Beat
+    private val bpm: Float = 96f
+    val beatPeriodNanos: Long = ((60f / bpm) * 1_000_000_000f).roundToLong()
 
-    var frogCombo by mutableIntStateOf(0)
-    var bearCombo by mutableIntStateOf(0)
-    var catCombo by mutableIntStateOf(0)
+    // cât de “iertător” e jocul (secunde până la beat)
+    private val baseHitWindowSec = 0.14f
 
-    var jam by mutableStateOf(0f)
-    var isFinalJam by mutableStateOf(false)
+    // HUD / scoring
+    var jam: Float = 0f
+        private set
 
-    private val bpm = 120f
-    val beatPeriodNanos = (60_000_000_000f / bpm).toLong().coerceAtLeast(1L)
+    var isFinalJam: Boolean = false
+        internal set
 
-    fun activeMusiciansCount(): Int {
-        var c = 0
-        if (frogPlaying) c++
-        if (bearPlaying) c++
-        if (catPlaying) c++
-        return c
-    }
+    val frog = MusicianRuntimeState(MusicianId.FROG)
+    val bear = MusicianRuntimeState(MusicianId.BEAR)
+    val cat = MusicianRuntimeState(MusicianId.CAT)
 
-    fun synergyMultiplier(): Float {
-        return when (activeMusiciansCount()) {
-            0 -> 1f
-            1 -> 1f
-            2 -> 1.25f
-            else -> 1.5f
-        }
-    }
+    private var pulseJobs: MutableMap<MusicianId, Job> = mutableMapOf()
 
-    fun evaluateHit(nowNanos: Long): BandHitQuality {
-        if (nowNanos <= 0L) return BandHitQuality.NONE
-        val phase = (nowNanos % beatPeriodNanos).toDouble() / beatPeriodNanos.toDouble()
-        val distToBeat = min(phase, 1.0 - phase) * beatPeriodNanos.toDouble()
-        val distMs = distToBeat / 1_000_000.0
-        return when {
-            distMs <= 70.0 -> BandHitQuality.PERFECT
-            distMs <= 150.0 -> BandHitQuality.GOOD
-            else -> BandHitQuality.MISS
-        }
-    }
-
-    fun onMusicianClick(id: MusicianId, nowNanos: Long) {
-        val quality = evaluateHit(nowNanos)
-        
-        when (id) {
-            MusicianId.FROG -> {
-                if (!frogPlaying) frogPlaying = true
-                frogCombo = updateCombo(frogCombo, quality)
-            }
-            MusicianId.BEAR -> {
-                if (!bearPlaying) bearPlaying = true
-                bearCombo = updateCombo(bearCombo, quality)
-            }
-            MusicianId.CAT -> {
-                if (!catPlaying) catPlaying = true
-                catCombo = updateCombo(catCombo, quality)
-            }
-        }
-        
-        val boost = if(quality == BandHitQuality.PERFECT) 0.05f else 0.02f
-        jam = (jam + boost * synergyMultiplier()).coerceIn(0f, 1f)
-    }
-
-    private fun updateCombo(current: Int, quality: BandHitQuality): Int {
-        return when (quality) {
-            BandHitQuality.PERFECT, BandHitQuality.GOOD -> (current + 1).coerceAtMost(999)
-            BandHitQuality.MISS -> 0
-            else -> current
-        }
-    }
+    fun activeMusiciansCount(): Int = listOf(frog, bear, cat).count { it.enabled }
 
     fun toggleMusician(id: MusicianId) {
-        when(id) {
-            MusicianId.FROG -> frogPlaying = !frogPlaying
-            MusicianId.BEAR -> bearPlaying = !bearPlaying
-            MusicianId.CAT -> catPlaying = !catPlaying
+        val m = musician(id)
+        m.enabled = !m.enabled
+        if (!m.enabled) {
+            m.performing = false
+            m.combo = 0
         }
+    }
+
+    fun togglePerforming(id: MusicianId) {
+        val m = musician(id)
+        if (!m.enabled) return
+        m.performing = !m.performing
+        if (!m.performing) m.combo = 0
+    }
+
+    /**
+     * Tap = “hit timing” (combo + jam).
+     * Dacă e hit bun => pulse performing scurt (dacă nu e deja performing persistent).
+     */
+    fun onMusicianTap(id: MusicianId, nowNanos: Long) {
+        val m = musician(id)
+        if (!m.enabled) return
+
+        val phase = beatPhase(nowNanos) // 0..1
+        val dist = min(phase, 1f - phase) // distanța până la beat boundary (0 sau 1)
+
+        val hitWindow = baseHitWindowSec
+        val distSec = dist * (beatPeriodNanos.toDouble() / 1_000_000_000.0).toFloat()
+
+        val success = distSec <= hitWindow
+        if (success) {
+            m.combo += 1
+            jam = (jam + 0.06f + (m.combo.coerceAtMost(10) * 0.004f)).coerceIn(0f, 1f)
+            if (jam >= 1f) isFinalJam = true
+
+            if (!m.performing) pulsePerforming(id, 650)
+        } else {
+            // miss => rupe combo (dar nu penalizează jam agresiv)
+            m.combo = 0
+            jam = (jam - 0.02f).coerceIn(0f, 1f)
+        }
+    }
+
+    private fun pulsePerforming(id: MusicianId, ms: Long) {
+        val m = musician(id)
+        pulseJobs[id]?.cancel()
+        pulseJobs[id] = viewModelScope.launch {
+            m.performing = true
+            delay(ms)
+            // revine la false doar dacă nu e “persistent toggle” (aici e pulse, deci îl punem false)
+            m.performing = false
+        }
+    }
+
+    private fun musician(id: MusicianId): MusicianRuntimeState =
+        when (id) {
+            MusicianId.FROG -> frog
+            MusicianId.BEAR -> bear
+            MusicianId.CAT -> cat
+        }
+
+    private fun beatPhase(nowNanos: Long): Float {
+        if (beatPeriodNanos <= 0) return 0f
+        val mod = nowNanos % beatPeriodNanos
+        return (mod.toDouble() / beatPeriodNanos.toDouble()).toFloat().coerceIn(0f, 1f)
     }
 }

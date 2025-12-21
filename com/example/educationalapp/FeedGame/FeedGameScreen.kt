@@ -1,20 +1,21 @@
 package com.example.educationalapp.FeedGame
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.educationalapp.AnimalBandGame.splitSpriteSheet
 import com.example.educationalapp.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
@@ -26,103 +27,168 @@ fun FeedGameScreen(
     onHome: () -> Unit
 ) {
     val context = LocalContext.current
-    var monsterFrames by remember { mutableStateOf(listOf<androidx.compose.ui.graphics.ImageBitmap>()) }
+
+    var assets by remember { mutableStateOf<FeedLoadedAssets?>(null) }
     var loaded by remember { mutableStateOf(false) }
 
-    // --- FIX CRITIC: inScaled = false + CORECT GRID: 4 x 8 ---
+    // VFX
+    val vfx = remember { FeedVfxState() }
+    var monsterAnchor by remember { mutableStateOf(Offset.Zero) }
+
+    // Load assets
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            val opts = BitmapFactory.Options().apply { inScaled = false }
-            val sheet = BitmapFactory.decodeResource(context.resources, R.drawable.monster_sheet, opts)
-            val frames = splitSpriteSheet(sheet, 4, 8).map { it.asImageBitmap() } // 32 frames
+            val a = FeedAssets.load(context)
             withContext(Dispatchers.Main) {
-                monsterFrames = frames
+                assets = a
                 loaded = true
             }
         }
     }
 
-    // Animatie Monstru (delta real)
-    val cols = 8
-    val idleCount = cols * 2          // 16 (primele 2 rânduri)
-    val eatCount = cols * 2           // 16 (ultimele 2 rânduri)
-    val isEating = viewModel.monsterState == FeedGameViewModel.STATE_EATING
-    val baseIndex = if (isEating) idleCount else 0
-    val animCount = if (isEating) eatCount else idleCount
+    // VFX spawn on feedEvent
+    val feedEvent = viewModel.feedEvent
+    LaunchedEffect(feedEvent) {
+        if (feedEvent <= 0) return@LaunchedEffect
+        if (viewModel.lastFeedCorrect) {
+            FeedVfx.spawnStars(vfx, monsterAnchor, count = 8)
+        }
+    }
 
+    // VFX loop
+    LaunchedEffect(Unit) {
+        var last = 0L
+        while (isActive) {
+            val now = withFrameNanos { it }
+            if (last == 0L) { last = now; continue }
+            val dt = ((now - last).toDouble() / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
+            last = now
+            FeedVfx.update(vfx, dt)
+        }
+    }
+
+    // Monster anim loop
     var localFrame by remember { mutableIntStateOf(0) }
-
     LaunchedEffect(loaded, viewModel.monsterState) {
-        if (!loaded) return@LaunchedEffect
-        localFrame = 0
+        val a = assets ?: return@LaunchedEffect
+        if (!loaded || a.monsterFrames.isEmpty()) {
+            localFrame = 0
+            return@LaunchedEffect
+        }
 
-        val framePeriod = if (isEating) 0.10f else 0.14f // mănâncă puțin mai rapid, idle mai lent
+        localFrame = 0
         var last = 0L
         var acc = 0f
 
         while (isActive) {
             val now = withFrameNanos { it }
-            if (last == 0L) {
-                last = now
-                continue
-            }
+            if (last == 0L) { last = now; continue }
             val dt = ((now - last).toDouble() / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
             last = now
 
+            val eating = viewModel.monsterState == MonsterState.EATING
+            val spec = a.monsterSpec
+            val range = if (eating) spec.eat else spec.idle
+            val period = if (eating) spec.eatFramePeriodSec else spec.idleFramePeriodSec
+
             acc += dt
-            if (acc >= framePeriod) {
-                acc -= framePeriod
-                localFrame = (localFrame + 1) % animCount
+            if (acc >= period) {
+                acc -= period
+                localFrame = (localFrame + 1) % (range.count.coerceAtLeast(1))
             }
         }
     }
 
     Box(Modifier.fillMaxSize()) {
         Image(
-            painterResource(R.drawable.game_bg),
-            null,
+            painter = painterResource(id = R.drawable.game_bg),
+            contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
 
-        // MONSTRU (mai mare)
-        if (monsterFrames.isNotEmpty()) {
-            val idx = (baseIndex + localFrame) % monsterFrames.size
-            Image(
-                bitmap = monsterFrames[idx],
-                contentDescription = "Monster",
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 40.dp)
-                    .size(450.dp) // mai mare decât 400.dp
-            )
-        }
-
-        // Foods (stânga)
-        Column(
-            Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 20.dp)
-        ) {
-            viewModel.foods.forEach { food ->
-                Image(
-                    painter = painterResource(food.resId),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(100.dp)
-                        .padding(10.dp)
-                        .clickable { viewModel.onFed(food) }
-                )
-            }
-        }
-
         Image(
-            painterResource(R.drawable.ui_button_home),
-            "Home",
-            Modifier
+            painter = painterResource(id = R.drawable.ui_button_home),
+            contentDescription = "Home",
+            modifier = Modifier
+                .align(Alignment.TopStart)
                 .padding(16.dp)
                 .size(64.dp)
                 .clickable { onHome() }
         )
+
+        // Wanted food (sus dreapta)
+        val wanted = viewModel.wantedFood
+        if (wanted != null) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.vfx_star),
+                    contentDescription = null,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(Modifier.height(6.dp))
+                Image(
+                    painter = painterResource(id = wanted.resId),
+                    contentDescription = wanted.name,
+                    modifier = Modifier.size(86.dp)
+                )
+            }
+        }
+
+        // Monster (dreapta, mare)
+        val a = assets
+        if (a != null && a.monsterFrames.isNotEmpty()) {
+            val eating = viewModel.monsterState == MonsterState.EATING
+            val range = if (eating) a.monsterSpec.eat else a.monsterSpec.idle
+            val idx = range.index(localFrame).coerceIn(0, a.monsterFrames.lastIndex)
+
+            Image(
+                bitmap = a.monsterFrames[idx],
+                contentDescription = "Monster",
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 28.dp)
+                    .size(470.dp)
+                    .onGloballyPositioned { coords ->
+                        val pos = coords.positionInRoot()
+                        val size = coords.size
+                        // aproximăm "gura" pentru VFX
+                        monsterAnchor = Offset(pos.x + size.width * 0.55f, pos.y + size.height * 0.45f)
+                    }
+            )
+        }
+
+        // Foods (jos stanga)
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 18.dp, bottom = 18.dp)
+        ) {
+            viewModel.foods.forEach { food ->
+                Image(
+                    painter = painterResource(id = food.resId),
+                    contentDescription = food.name,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .padding(8.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { viewModel.onFed(food) }
+                )
+            }
+        }
+    }
+
+    // VFX layer on top (separat ca sa fie mereu deasupra)
+    if (assets?.starImage != null) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+            FeedVfx.draw(vfx, this, assets?.starImage)
+        }
     }
 }
