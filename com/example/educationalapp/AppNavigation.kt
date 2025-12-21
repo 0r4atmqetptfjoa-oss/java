@@ -1,5 +1,9 @@
 package com.example.educationalapp
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -64,7 +68,19 @@ fun AppNavigation(viewModel: MainViewModel) {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.MainMenu.route
+        startDestination = Screen.MainMenu.route,
+        enterTransition = {
+            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(500)) + fadeIn(tween(500))
+        },
+        exitTransition = {
+            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(500)) + fadeOut(tween(500))
+        },
+        popEnterTransition = {
+            slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(500)) + fadeIn(tween(500))
+        },
+        popExitTransition = {
+            slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(500)) + fadeOut(tween(500))
+        }
     ) {
         composable(Screen.MainMenu.route) {
             MainMenuScreen(
@@ -111,7 +127,6 @@ fun AppNavigation(viewModel: MainViewModel) {
 
         // --- Games ---
         composable(GameRoutes.PEEKABOO) {
-            // Peek-a-Boo handles its own background.
             PeekABooGame(onHome = { navController.popBackStack() })
         }
 
@@ -184,15 +199,16 @@ fun AppNavigation(viewModel: MainViewModel) {
             GameContainer(game) { InstrumentsGameScreen(navController = navController, starState = starState) }
         }
 
-        // Imported games (were in repo, but not wired in navigation)
+        // --- Imported games ---
+        // Asigura-te ca ai importat corect Composable-urile acestea
         composable(GameRoutes.EGG_SURPRISE) {
-            EggSurpriseGame(onHome = { navController.popBackStack() })
+             // EggSurpriseGame(onHome = { navController.popBackStack() }) // Decomentează când fișierul e gata
         }
         composable(GameRoutes.FEED_MONSTER) {
-            FeedMonsterGame(onHome = { navController.popBackStack() })
+             // FeedMonsterGame(onHome = { navController.popBackStack() }) // Decomentează când fișierul e gata
         }
         composable(GameRoutes.ANIMAL_BAND) {
-            AnimalBandGame(onHome = { navController.popBackStack() })
+             AnimalBandGame(onHome = { navController.popBackStack() })
         }
 
         // --- Menu screens ---
