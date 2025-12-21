@@ -45,7 +45,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
-// --- NOTE: Toate clasele de jos au prefixul "Band" pentru a nu intra în conflict cu celelalte jocuri ---
+// --- Animal Band Game Fix ---
 
 @Composable
 fun AnimalBandGame(onHome: () -> Unit = {}) {
@@ -63,6 +63,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     var bearFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
     var catFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
     var noteImage by remember { mutableStateOf<ImageBitmap?>(null) }
+    var assetsLoaded by remember { mutableStateOf(false) }
 
     // --- STARE MUZICANTI ---
     var frogPlaying by remember { mutableStateOf(false) }
@@ -85,7 +86,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     var bearAnchor by remember { mutableStateOf(Offset.Zero) }
     var catAnchor by remember { mutableStateOf(Offset.Zero) }
 
-    // --- VFX / GAME STATE ---
+    // --- VFX ---
     val particles = remember { mutableStateListOf<BandParticle>() }
     val shockwaves = remember { mutableStateListOf<BandShockwave>() }
 
@@ -102,38 +103,31 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
         else ((clockNanos % beatPeriodNanos).toDouble() / beatPeriodNanos.toDouble()).toFloat()
     }
 
-    // --- LOAD RESOURCES ---
+    // --- LOAD RESOURCES (CRITICAL FIX: inScaled = false) ---
     LaunchedEffect(Unit) {
-        val (frog, bear, cat, note) = withContext(Dispatchers.Default) {
-            val frogSheet = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.band_frog_sheet)
-            }
-            val bearSheet = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.band_bear_sheet)
-            }
-            val catSheet = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.band_cat_sheet)
-            }
-            val noteBmp = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.vfx_music_note)
-            }
+        withContext(Dispatchers.IO) {
+            val opts = BitmapFactory.Options().apply { inScaled = false } // PREVINE SCALING-UL AUTOMAT
 
-            val frogFramesBmp = splitSpriteSheet(frogSheet, rows = 4, cols = 6, safetyCrop = true)
-            val bearFramesBmp = splitSpriteSheet(bearSheet, rows = 4, cols = 6, safetyCrop = true)
-            val catFramesBmp = splitSpriteSheet(catSheet, rows = 4, cols = 6, safetyCrop = true)
+            val frogSheet = BitmapFactory.decodeResource(context.resources, R.drawable.band_frog_sheet, opts)
+            val bearSheet = BitmapFactory.decodeResource(context.resources, R.drawable.band_bear_sheet, opts)
+            val catSheet = BitmapFactory.decodeResource(context.resources, R.drawable.band_cat_sheet, opts)
+            val noteBmp = BitmapFactory.decodeResource(context.resources, R.drawable.vfx_music_note, opts)
 
-            BandQuad(
-                frogFramesBmp.map { it.asImageBitmap() },
-                bearFramesBmp.map { it.asImageBitmap() },
-                catFramesBmp.map { it.asImageBitmap() },
-                noteBmp.asImageBitmap()
-            )
+            // Folosim 4 randuri, 6 coloane (standardul tau)
+            val fFrog = splitSpriteSheet(frogSheet, 4, 6).map { it.asImageBitmap() }
+            val fBear = splitSpriteSheet(bearSheet, 4, 6).map { it.asImageBitmap() }
+            val fCat = splitSpriteSheet(catSheet, 4, 6).map { it.asImageBitmap() }
+            
+            val fNote = noteBmp?.asImageBitmap()
+
+            withContext(Dispatchers.Main) {
+                frogFrames = fFrog
+                bearFrames = fBear
+                catFrames = fCat
+                noteImage = fNote
+                assetsLoaded = true
+            }
         }
-
-        frogFrames = frog
-        bearFrames = bear
-        catFrames = cat
-        noteImage = note
     }
 
     fun activeMusiciansCount(): Int {
@@ -409,93 +403,97 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // B. Glow
-        val glowAlpha = (0.05f + jam * 0.10f + (if (isFinalJam) 0.12f else 0f)).coerceIn(0f, 0.35f)
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(glowAlpha)
-        ) {
-            drawRect(color = Color.White.copy(alpha = 0.22f), size = size.copy(height = size.height * 0.12f))
-            val c = Offset(size.width * 0.5f, size.height * 0.45f)
-            drawCircle(color = Color.White.copy(alpha = 0.18f), radius = min(size.width, size.height) * 0.38f, center = c)
-        }
-
-        // C. Beat Bar + Jam Meter
-        BandHudTop(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 10.dp, start = 12.dp, end = 12.dp),
-            beatPhase = beatPhase,
-            jam = jam,
-            isFinalJam = isFinalJam
-        )
-
-        // D. Band area
-        val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (8f + jam * 14f) * (if (activeMusiciansCount() > 0) 1f else 0f))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .offset { IntOffset(0, bouncePx.roundToInt()) }
-                .padding(bottom = 20.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            MusicianCharacter(
-                frames = frogFrames,
-                isPlaying = frogPlaying,
-                combo = frogCombo,
-                lastHit = frogLastHit,
-                lastHitAtNanos = frogLastHitAt,
-                label = "Frog",
-                onAnchor = { frogAnchor = it },
-                onClick = { onMusicianClick(MusicianId.FROG) },
-                onDoubleTap = { onMusicianDoubleTap(MusicianId.FROG) }
-            )
-
-            MusicianCharacter(
-                frames = bearFrames,
-                isPlaying = bearPlaying,
-                combo = bearCombo,
-                lastHit = bearLastHit,
-                lastHitAtNanos = bearLastHitAt,
-                label = "Bear",
-                onAnchor = { bearAnchor = it },
-                onClick = { onMusicianClick(MusicianId.BEAR) },
-                onDoubleTap = { onMusicianDoubleTap(MusicianId.BEAR) }
-            )
-
-            MusicianCharacter(
-                frames = catFrames,
-                isPlaying = catPlaying,
-                combo = catCombo,
-                lastHit = catLastHit,
-                lastHitAtNanos = catLastHitAt,
-                label = "Cat",
-                onAnchor = { catAnchor = it },
-                onClick = { onMusicianClick(MusicianId.CAT) },
-                onDoubleTap = { onMusicianDoubleTap(MusicianId.CAT) }
-            )
-        }
-
-        // E. VFX layer
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val note = noteImage
-            shockwaves.forEach { it.draw(this) }
-            particles.forEach { p ->
-                p.draw(this, note)
-            }
-        }
-
-        // F. Screen flash
-        if (screenFlash > 0f) {
+        if (!assetsLoaded) {
+            Text("Loading Band...", color = Color.White, modifier = Modifier.align(Alignment.Center))
+        } else {
+            // B. Glow
+            val glowAlpha = (0.05f + jam * 0.10f + (if (isFinalJam) 0.12f else 0f)).coerceIn(0f, 0.35f)
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha((screenFlash * 0.35f).coerceIn(0f, 0.35f))
+                    .alpha(glowAlpha)
             ) {
-                drawRect(color = Color.White)
+                drawRect(color = Color.White.copy(alpha = 0.22f), size = size.copy(height = size.height * 0.12f))
+                val c = Offset(size.width * 0.5f, size.height * 0.45f)
+                drawCircle(color = Color.White.copy(alpha = 0.18f), radius = min(size.width, size.height) * 0.38f, center = c)
+            }
+
+            // C. Beat Bar + Jam Meter
+            BandHudTop(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 10.dp, start = 12.dp, end = 12.dp),
+                beatPhase = beatPhase,
+                jam = jam,
+                isFinalJam = isFinalJam
+            )
+
+            // D. Band area
+            val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (8f + jam * 14f) * (if (activeMusiciansCount() > 0) 1f else 0f))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .offset { IntOffset(0, bouncePx.roundToInt()) }
+                    .padding(bottom = 20.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                MusicianCharacter(
+                    frames = frogFrames,
+                    isPlaying = frogPlaying,
+                    combo = frogCombo,
+                    lastHit = frogLastHit,
+                    lastHitAtNanos = frogLastHitAt,
+                    label = "Frog",
+                    onAnchor = { frogAnchor = it },
+                    onClick = { onMusicianClick(MusicianId.FROG) },
+                    onDoubleTap = { onMusicianDoubleTap(MusicianId.FROG) }
+                )
+
+                MusicianCharacter(
+                    frames = bearFrames,
+                    isPlaying = bearPlaying,
+                    combo = bearCombo,
+                    lastHit = bearLastHit,
+                    lastHitAtNanos = bearLastHitAt,
+                    label = "Bear",
+                    onAnchor = { bearAnchor = it },
+                    onClick = { onMusicianClick(MusicianId.BEAR) },
+                    onDoubleTap = { onMusicianDoubleTap(MusicianId.BEAR) }
+                )
+
+                MusicianCharacter(
+                    frames = catFrames,
+                    isPlaying = catPlaying,
+                    combo = catCombo,
+                    lastHit = catLastHit,
+                    lastHitAtNanos = catLastHitAt,
+                    label = "Cat",
+                    onAnchor = { catAnchor = it },
+                    onClick = { onMusicianClick(MusicianId.CAT) },
+                    onDoubleTap = { onMusicianDoubleTap(MusicianId.CAT) }
+                )
+            }
+
+            // E. VFX layer
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val note = noteImage
+                shockwaves.forEach { it.draw(this) }
+                particles.forEach { p ->
+                    p.draw(this, note)
+                }
+            }
+
+            // F. Screen flash
+            if (screenFlash > 0f) {
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .alpha((screenFlash * 0.35f).coerceIn(0f, 0.35f))
+                ) {
+                    drawRect(color = Color.White)
+                }
             }
         }
 
@@ -614,7 +612,8 @@ private fun MusicianCharacter(
             val dt = ((now - last).toDouble() / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
             last = now
             acc += dt
-            val frameDuration = if (isPlaying) 0.060f else 0.10f
+            // FIX VITEZA: 0.12f in loc de 0.06f pentru a incetini animatia (sa nu mai deruleze rapid)
+            val frameDuration = if (isPlaying) 0.12f else 0.18f
             while (acc >= frameDuration) {
                 if (isPlaying) {
                     if (currentFrame < 12) currentFrame = 12
@@ -660,7 +659,7 @@ private fun MusicianCharacter(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            Text("Loading...", color = Color.White)
+            // Nu aratam nimic daca frames e gol, pentru a evita flash-uri
         }
 
         Column(
@@ -686,26 +685,28 @@ private fun MusicianCharacter(
     }
 }
 
+// FUNCȚIE CORECTATĂ PENTRU SPRITE-URI FIXE (FĂRĂ DERULARE)
 private fun splitSpriteSheet(
-    sheet: Bitmap,
+    sheet: Bitmap?,
     rows: Int,
-    cols: Int,
-    safetyCrop: Boolean
+    cols: Int
 ): List<Bitmap> {
-    if (rows <= 0 || cols <= 0) return emptyList()
+    if (sheet == null || rows <= 0 || cols <= 0) return emptyList()
+    
+    // Calculăm dimensiunea exactă a unei celule
     val frameW = sheet.width / cols
     val frameH = sheet.height / rows
+    
+    // Dacă imaginea e prea mică sau invalidă
     if (frameW <= 0 || frameH <= 0) return emptyList()
 
-    val crop = if (safetyCrop) 1 else 0
     val out = ArrayList<Bitmap>(rows * cols)
     for (r in 0 until rows) {
         for (c in 0 until cols) {
-            val x = c * frameW + crop
-            val y = r * frameH + crop
-            val w = (frameW - crop * 2).coerceAtLeast(1)
-            val h = (frameH - crop * 2).coerceAtLeast(1)
-            out.add(Bitmap.createBitmap(sheet, x.coerceAtLeast(0), y.coerceAtLeast(0), w, h))
+            val x = c * frameW
+            val y = r * frameH
+            // Nu mai folosim safetyCrop pentru ca strica gridul perfect
+            out.add(Bitmap.createBitmap(sheet, x, y, frameW, frameH))
         }
     }
     return out

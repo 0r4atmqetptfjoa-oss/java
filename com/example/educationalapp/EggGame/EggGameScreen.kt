@@ -45,7 +45,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
-// --- NOTE: Prefix "Egg" pentru a evita conflicte ---
+// --- Egg Game Fix ---
 
 enum class EggGameState {
     EGG_INTACT,
@@ -289,16 +289,20 @@ fun EggSurpriseGame(onHome: () -> Unit = {}) {
         }
     }
 
+    // --- FIX IMAGINI ALBE ---
     LaunchedEffect(Unit) {
-        val (frames, shell) = withContext(Dispatchers.Default) {
-            val sheet = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.dragon_sheet)
-            }
-            val shellBmp = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.vfx_shell_piece)
-            }
-            val f = splitSpriteSheet(sheet, rows = 4, cols = 6, safetyCrop = true).map { it.asImageBitmap() }
-            Pair(f, shellBmp.asImageBitmap())
+        val (frames, shell) = withContext(Dispatchers.IO) {
+            // Folosim inScaled = false pentru a păstra imaginea originală
+            val opts = BitmapFactory.Options().apply { inScaled = false }
+            
+            val sheet = BitmapFactory.decodeResource(context.resources, R.drawable.dragon_sheet, opts)
+            val shellBmp = BitmapFactory.decodeResource(context.resources, R.drawable.vfx_shell_piece, opts)
+            
+            // Verificare null
+            if (sheet == null) return@withContext Pair(emptyList<ImageBitmap>(), null)
+            
+            val f = splitSpriteSheet(sheet, rows = 4, cols = 6).map { it.asImageBitmap() }
+            Pair(f, shellBmp?.asImageBitmap())
         }
         dragonFrames = frames
         shellImage = shell
@@ -695,26 +699,23 @@ private fun advanceDragonFrame(
     set(c)
 }
 
+// FUNCȚIE CORECTATĂ
 private fun splitSpriteSheet(
-    sheet: Bitmap,
+    sheet: Bitmap?,
     rows: Int,
-    cols: Int,
-    safetyCrop: Boolean
+    cols: Int
 ): List<Bitmap> {
-    if (rows <= 0 || cols <= 0) return emptyList()
+    if (sheet == null || rows <= 0 || cols <= 0) return emptyList()
     val frameW = sheet.width / cols
     val frameH = sheet.height / rows
     if (frameW <= 0 || frameH <= 0) return emptyList()
 
-    val crop = if (safetyCrop) 1 else 0
     val out = ArrayList<Bitmap>(rows * cols)
     for (r in 0 until rows) {
         for (c in 0 until cols) {
-            val x = c * frameW + crop
-            val y = r * frameH + crop
-            val w = (frameW - crop * 2).coerceAtLeast(1)
-            val h = (frameH - crop * 2).coerceAtLeast(1)
-            out.add(Bitmap.createBitmap(sheet, x.coerceAtLeast(0), y.coerceAtLeast(0), w, h))
+            val x = c * frameW
+            val y = r * frameH
+            out.add(Bitmap.createBitmap(sheet, x, y, frameW, frameH))
         }
     }
     return out

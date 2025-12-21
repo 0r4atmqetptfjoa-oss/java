@@ -55,7 +55,7 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-// --- NOTE: Prefix "Feed" pentru Shockwave ca sa fie unic ---
+// --- Feed Game Fix ---
 
 private enum class MonsterState { IDLE, EATING, PARTY }
 private enum class FoodType { HEALTHY, TREAT }
@@ -207,15 +207,16 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
     }
 
     LaunchedEffect(Unit) {
-        val (frames, star) = withContext(Dispatchers.Default) {
-            val sheet = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.monster_sheet)
-            }
-            val starBmp = withContext(Dispatchers.IO) {
-                BitmapFactory.decodeResource(context.resources, R.drawable.vfx_star)
-            }
-            val f = splitSpriteSheet(sheet, rows = 4, cols = 6, safetyCrop = true).map { it.asImageBitmap() }
-            Pair(f, starBmp.asImageBitmap())
+        val (frames, star) = withContext(Dispatchers.IO) {
+            val opts = BitmapFactory.Options().apply { inScaled = false }
+            
+            val sheet = BitmapFactory.decodeResource(context.resources, R.drawable.monster_sheet, opts)
+            val starBmp = BitmapFactory.decodeResource(context.resources, R.drawable.vfx_star, opts)
+            
+            if (sheet == null) return@withContext Pair(emptyList<ImageBitmap>(), null)
+
+            val f = splitSpriteSheet(sheet, rows = 4, cols = 6).map { it.asImageBitmap() }
+            Pair(f, starBmp?.asImageBitmap())
         }
         monsterFrames = frames
         starImage = star
@@ -683,26 +684,23 @@ private fun DraggableFoodIcon(
     )
 }
 
+// CORECTIE FINALA: splitSpriteSheet
 private fun splitSpriteSheet(
-    sheet: Bitmap,
+    sheet: Bitmap?,
     rows: Int,
-    cols: Int,
-    safetyCrop: Boolean
+    cols: Int
 ): List<Bitmap> {
-    if (rows <= 0 || cols <= 0) return emptyList()
+    if (sheet == null || rows <= 0 || cols <= 0) return emptyList()
     val frameW = sheet.width / cols
     val frameH = sheet.height / rows
     if (frameW <= 0 || frameH <= 0) return emptyList()
 
-    val crop = if (safetyCrop) 1 else 0
     val out = ArrayList<Bitmap>(rows * cols)
     for (r in 0 until rows) {
         for (c in 0 until cols) {
-            val x = c * frameW + crop
-            val y = r * frameH + crop
-            val w = (frameW - crop * 2).coerceAtLeast(1)
-            val h = (frameH - crop * 2).coerceAtLeast(1)
-            out.add(Bitmap.createBitmap(sheet, x.coerceAtLeast(0), y.coerceAtLeast(0), w, h))
+            val x = c * frameW
+            val y = r * frameH
+            out.add(Bitmap.createBitmap(sheet, x, y, frameW, frameH))
         }
     }
     return out
