@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.min
 
 enum class MascotMood { THINKING, HAPPY, SURPRISED, CELEBRATE, IDLE }
 
@@ -30,13 +31,26 @@ data class AlphabetGameUiState(
 @HiltViewModel
 class AlphabetGameViewModel @Inject constructor() : ViewModel() {
 
-    private val totalQuestions = 10
     private val MAX_ATTEMPTS = 2
+
+    /**
+     * Folosim un „deck” (listă amestecată) ca să evităm repetarea întrebărilor în aceeași sesiune.
+     */
+    private var questionDeck: List<AlphabetItem> = emptyList()
 
     private val _uiState: MutableStateFlow<AlphabetGameUiState> = MutableStateFlow(createInitialState())
     val uiState: StateFlow<AlphabetGameUiState> = _uiState
 
+    private fun buildDeck(total: Int): List<AlphabetItem> {
+        val all = AlphabetAssets.items
+        val safeTotal = min(total, all.size.coerceAtLeast(1))
+        return all.shuffled().take(safeTotal)
+    }
+
     private fun createInitialState(): AlphabetGameUiState {
+        val totalQuestions = min(10, AlphabetAssets.items.size.coerceAtLeast(1))
+        questionDeck = buildDeck(totalQuestions)
+
         val (q, opts) = generateQuestion(0)
         return AlphabetGameUiState(
             currentQuestion = q,
@@ -52,16 +66,17 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
     }
 
     private fun generateQuestion(questionIndex: Int): Pair<AlphabetItem, List<String>> {
-        val all = AlphabetAssets.items
-        val current = all.random()
+        val current = questionDeck[questionIndex.coerceIn(questionDeck.indices)]
         val correctBase = AlphabetAssets.normalizeBase(current.displayLetter)
 
-        val otherDisplays = all
+        val otherDisplays = AlphabetAssets.items
+            .asSequence()
             .map { it.displayLetter }
             .distinct()
             .filter { AlphabetAssets.normalizeBase(it) != correctBase }
             .shuffled()
             .take(2)
+            .toList()
 
         val options = (listOf(current.displayLetter) + otherDisplays).shuffled()
         return current to options
@@ -91,7 +106,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
                 mascotMood = MascotMood.HAPPY
             )
             viewModelScope.launch {
-                delay(1000L)
+                delay(900L)
                 moveToNextOrFinish()
             }
         } else {
@@ -105,7 +120,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
                     mascotMood = MascotMood.SURPRISED
                 )
                 viewModelScope.launch {
-                    delay(800L)
+                    delay(650L)
                     _uiState.value = _uiState.value.copy(
                         selectedOption = null,
                         isAnswerCorrect = null,
@@ -122,7 +137,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
                     mascotMood = MascotMood.SURPRISED
                 )
                 viewModelScope.launch {
-                    delay(1000L)
+                    delay(900L)
                     moveToNextOrFinish()
                 }
             }
@@ -130,13 +145,18 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
     }
 
     private fun moveToNextOrFinish() {
-        val currentIndex = _uiState.value.questionIndex
-        if (currentIndex + 1 >= totalQuestions) {
-            _uiState.value = _uiState.value.copy(isFinished = true, isInputLocked = false, mascotMood = MascotMood.CELEBRATE)
+        val state = _uiState.value
+        val currentIndex = state.questionIndex
+        if (currentIndex + 1 >= state.totalQuestions) {
+            _uiState.value = state.copy(
+                isFinished = true,
+                isInputLocked = false,
+                mascotMood = MascotMood.CELEBRATE
+            )
         } else {
             val nextIndex = currentIndex + 1
             val (nextQ, nextOpts) = generateQuestion(nextIndex)
-            _uiState.value = _uiState.value.copy(
+            _uiState.value = state.copy(
                 currentQuestion = nextQ,
                 options = nextOpts,
                 questionIndex = nextIndex,

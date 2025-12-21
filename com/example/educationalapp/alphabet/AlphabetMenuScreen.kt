@@ -12,8 +12,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
@@ -36,7 +38,11 @@ fun AlphabetMenuScreen(
 ) {
     val context = LocalContext.current
     val soundPlayer = remember { AlphabetSoundPlayer(context) }
-    
+
+    // Sound toggle local (pentru click-uri din meniu).
+    var soundOn by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(soundOn) { soundPlayer.isEnabled = soundOn }
+
     // Curățăm resursele când părăsim meniul
     DisposableEffect(Unit) {
         onDispose { soundPlayer.release() }
@@ -51,6 +57,34 @@ fun AlphabetMenuScreen(
             contentScale = ContentScale.Crop
         )
 
+        // Toggle sound (dreapta sus)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(18.dp)
+        ) {
+            MenuScaleButton(
+                onClick = { soundOn = !soundOn },
+                modifier = Modifier.size(50.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White, CircleShape)
+                        .border(2.dp, Color(0xFFEEEEEE), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = AlphabetUi.Icons.soundOn),
+                        contentDescription = "Sound",
+                        modifier = Modifier
+                            .size(28.dp)
+                            .alpha(if (soundOn) 1f else 0.45f)
+                    )
+                }
+            }
+        }
+
         // 2. CONȚINUT CENTRAL (Titlu + Mascota)
         Column(
             modifier = Modifier
@@ -59,7 +93,7 @@ fun AlphabetMenuScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            
+
             // TITLU
             val infiniteTransition = rememberInfiniteTransition(label = "title")
             val scale by infiniteTransition.animateFloat(
@@ -100,12 +134,12 @@ fun AlphabetMenuScreen(
                     .rotate(rotateAnim),
                 contentScale = ContentScale.Fit
             )
-            
+
             Spacer(modifier = Modifier.height(10.dp))
         }
 
         // 3. ZONA DE JOS
-        
+
         // Butonul JOACĂ
         Box(
             modifier = Modifier

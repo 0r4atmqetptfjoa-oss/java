@@ -8,6 +8,16 @@ class AlphabetSoundPlayer(private val context: Context) {
 
     private var mediaPlayer: MediaPlayer? = null
 
+    /**
+     * Când sunetul este dezactivat, oprim imediat orice redare în curs.
+     * E util atât pentru meniuri, cât și pentru ecranul de joc.
+     */
+    var isEnabled: Boolean = true
+        set(value) {
+            field = value
+            if (!value) stop()
+        }
+
     fun playClick() {
         playSound(R.raw.buton_click)
     }
@@ -21,11 +31,13 @@ class AlphabetSoundPlayer(private val context: Context) {
     }
 
     private fun playSound(resId: Int) {
+        if (!isEnabled) return
+
         // 1. Oprim orice sunet care rula înainte (logica de "tăiere")
         stop()
 
         // 2. Pornim sunetul nou
-        mediaPlayer = MediaPlayer.create(context, resId).apply {
+        mediaPlayer = MediaPlayer.create(context, resId)?.apply {
             setOnCompletionListener { mp ->
                 mp.release()
                 if (mediaPlayer == mp) {
@@ -46,7 +58,7 @@ class AlphabetSoundPlayer(private val context: Context) {
             mediaPlayer = null
         }
     }
-    
+
     // Apelăm asta când ieșim din ecran ca să nu rămână resurse blocate
     fun release() {
         stop()

@@ -11,12 +11,13 @@ import androidx.navigation.compose.rememberNavController
 import com.example.educationalapp.alphabet.AlphabetGameScreen
 import com.example.educationalapp.alphabet.AlphabetMenuScreen
 import com.example.educationalapp.colors.ColorsGameScreen
-import com.example.educationalapp.features.games.* import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
+import com.example.educationalapp.features.games.*
+import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
 import com.example.educationalapp.features.mainmenu.MainMenuScreen
 import com.example.educationalapp.features.songs.SongsMenuScreen
 import com.example.educationalapp.features.songs.SongPlayerScreen
 import com.example.educationalapp.features.sounds.*
-import com.example.educationalapp.features.settings.SettingsScreen
+// AM ȘTERS IMPORTUL GREȘIT PENTRU SETTINGS - E ÎN ACELAȘI PACHET
 import com.example.educationalapp.features.stories.StoriesMenuScreen
 import com.example.educationalapp.peekaboo.PeekABooGame
 import com.example.educationalapp.puzzle.PuzzleGameScreen
@@ -96,15 +97,12 @@ fun AppNavigation(viewModel: MainViewModel) {
         }
 
         /**
-         * Alphabet graph (MODIFICAT: Direct în joc)
-         * Am schimbat startDestination la ALPHABET_QUIZ și am scos meniul.
+         * Alphabet graph (Direct în joc)
          */
         navigation(
-            startDestination = GameRoutes.ALPHABET_QUIZ, // <-- Start direct cu jocul
+            startDestination = GameRoutes.ALPHABET_QUIZ, 
             route = GameRoutes.ALPHABET_GRAPH
         ) {
-            // Am eliminat composable(GameRoutes.ALPHABET_MENU)
-
             composable(GameRoutes.ALPHABET_QUIZ) {
                 AlphabetGameScreen(
                     onBackToMenu = { navController.popBackStack() }
