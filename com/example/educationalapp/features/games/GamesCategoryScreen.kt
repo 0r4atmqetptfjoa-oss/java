@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.educationalapp.R
 
-
 data class GameItem(
     val title: String,
     val icon: Int,
@@ -33,34 +32,20 @@ data class GameItem(
     val destination: String
 )
 
-// Games shown in the Games category.
-// Note: many games reuse existing icons/backgrounds as placeholders to avoid new drawable dependencies.
+// AICI ADĂUGĂM JOCURILE NOI
 val gamesList = listOf(
-    GameItem("Peek-a-Boo", R.drawable.icon_game_hiddenobjects, R.drawable.bg_sunny_meadow, GameRoutes.PEEKABOO),
-    GameItem("Alphabet", R.drawable.icon_game_alphabet, R.drawable.bg_game_alphabet, GameRoutes.ALPHABET),
-    GameItem("Colors", R.drawable.icon_game_colors, R.drawable.bg_game_colors, GameRoutes.COLORS),
-    GameItem("Shapes", R.drawable.icon_game_shapes, R.drawable.bg_game_shapes, GameRoutes.SHAPES),
-    GameItem("Puzzle", R.drawable.icon_game_puzzle, R.drawable.bg_game_puzzle, GameRoutes.PUZZLE),
-    GameItem("Memory", R.drawable.icon_game_memory, R.drawable.bg_game_memory, GameRoutes.MEMORY),
-    GameItem("Hidden Objects", R.drawable.icon_game_hiddenobjects, R.drawable.bg_game_hiddenobjects, GameRoutes.HIDDEN_OBJECTS),
-    GameItem("Sorting", R.drawable.icon_game_sorting, R.drawable.bg_game_sorting, GameRoutes.SORTING),
-    GameItem("Sequence", R.drawable.icon_game_sequence, R.drawable.bg_game_sequence, GameRoutes.SEQUENCE),
-    GameItem("Math", R.drawable.icon_game_math, R.drawable.bg_game_math, GameRoutes.MATH),
-
-    // Newly linked mini-games (placeholders for icon/background)
-    GameItem("Coding", R.drawable.icon_game_sequence, R.drawable.bg_sunny_meadow, GameRoutes.CODING),
-    GameItem("Maze", R.drawable.icon_game_puzzle, R.drawable.bg_sunny_meadow, GameRoutes.MAZE),
-    GameItem("Blocks", R.drawable.icon_game_shapes, R.drawable.bg_sunny_meadow, GameRoutes.BLOCKS),
-    GameItem("Cooking", R.drawable.icon_game_colors, R.drawable.bg_sunny_meadow, GameRoutes.COOKING),
-    GameItem("Shadow Match", R.drawable.icon_game_memory, R.drawable.bg_sunny_meadow, GameRoutes.SHADOW_MATCH),
-    GameItem("Animal Sorting", R.drawable.icon_game_hiddenobjects, R.drawable.bg_sunny_meadow, GameRoutes.ANIMAL_SORTING),
-    GameItem("Emotions", R.drawable.icon_game_alphabet, R.drawable.bg_sunny_meadow, GameRoutes.EMOTIONS),
-    GameItem("Instruments", R.drawable.icon_game_instruments, R.drawable.bg_sunny_meadow, GameRoutes.INSTRUMENTS),
-
-    // Imported mini-games previously not wired in this codebase
-    GameItem("Egg Surprise", R.drawable.icon_game_puzzle, R.drawable.bg_sunny_meadow, GameRoutes.EGG_SURPRISE),
-    GameItem("Feed Monster", R.drawable.icon_game_colors, R.drawable.bg_sunny_meadow, GameRoutes.FEED_MONSTER),
-    GameItem("Animal Band", R.drawable.icon_game_instruments, R.drawable.bg_sunny_meadow, GameRoutes.ANIMAL_BAND)
+    // Folosim icon_game_hiddenobjects ca placeholder pentru Peek-a-Boo momentan
+    GameItem("Peek-a-Boo", R.drawable.icon_game_hiddenobjects, R.drawable.bg_sunny_meadow, "peekaboo"),
+    GameItem("Alphabet", R.drawable.icon_game_alphabet, R.drawable.bg_game_alphabet, "alphabet"),
+    GameItem("Colors", R.drawable.icon_game_colors, R.drawable.bg_game_colors, "colors"),
+    GameItem("Shapes", R.drawable.icon_game_shapes, R.drawable.bg_game_shapes, "shapes"),
+    GameItem("Puzzle", R.drawable.icon_game_puzzle, R.drawable.bg_game_puzzle, "puzzle"),
+    GameItem("Memory", R.drawable.icon_game_memory, R.drawable.bg_game_memory, "memory"),
+    GameItem("Hidden Objects", R.drawable.icon_game_hiddenobjects, R.drawable.bg_game_hiddenobjects, "hidden"),
+    GameItem("Sorting", R.drawable.icon_game_sorting, R.drawable.bg_game_sorting, "sorting"),
+    GameItem("Instruments", R.drawable.icon_game_instruments, R.drawable.bg_game_instruments, "instruments"),
+    GameItem("Sequence", R.drawable.icon_game_sequence, R.drawable.bg_game_sequence, "sequence"),
+    GameItem("Math", R.drawable.icon_game_math, R.drawable.bg_game_math, "math")
 )
 
 @Composable
