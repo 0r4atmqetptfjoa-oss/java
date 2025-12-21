@@ -3,6 +3,7 @@ package com.example.educationalapp
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -46,11 +47,11 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -574,8 +575,15 @@ private fun DraggableFoodIcon(
     val halfPx = remember(density, sizeDp) { with(density) { sizeDp.toPx() } * 0.5f }
 
     var startPosRoot by remember { mutableStateOf(Offset.Zero) }
-    val offset = remember { Animatable(Offset.Zero, VectorConverter) }
+    
+    // Corectie: Type inference explicit si accesarea corecta a VectorConverter
+    val offset = remember { 
+        Animatable(Offset.Zero, Offset.VectorConverter) 
+    }
     val scale = remember { Animatable(1f) }
+
+    // Avem nevoie de un scope extern pentru a lansa animatii independente de gest (ex: release)
+    val scope = rememberCoroutineScope()
 
     var visible by remember { mutableStateOf(true) }
 
@@ -608,24 +616,10 @@ private fun DraggableFoodIcon(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     
-                    // Acestea trebuie rulate intr-un launch separat pentru ca sunt suspendate
-                    // dar in contextul pointerInput ele blocheaza. Folosim launch non-blocant daca e nevoie,
-                    // sau le apelam aici stiind ca sunt rapide. In awaitEachGesture e ok.
-                    // NOTA: animateTo/snapTo sunt suspend functions. Aici e ok.
-                    
-                    // Stop current animation
-                    try {
-                        // Nu putem apela suspend functions direct daca vrem sa procesam input continuu in bucla
-                        // decat daca sunt "fire and forget".
-                        // Dar aici e fine sa facem snap.
-                    } catch (e: Exception) {}
+                    // Feedback visual la touch (optional, folosind scope extern pentru a nu bloca)
+                    scope.launch { scale.animateTo(1.10f, tween(80)) }
 
                     val pointerId = down.id
-                    
-                    // Feedback visual la touch
-                    // Nu putem face scale.animateTo aici fara sa blocam detectia.
-                    // Solutia corecta in Compose gesturi complexe e sa folosim coroutineScope extern pentru animatii
-                    // Dar pentru simplitate, vom presupune ca utilizatorul tine apasat.
 
                     while (true) {
                         val event = awaitPointerEvent()
@@ -635,8 +629,15 @@ private fun DraggableFoodIcon(
                         val delta = change.positionChange()
                         if (delta != Offset.Zero) {
                             change.consume()
-                            // Snap e instant, deci nu blocheaza loop-ul
-                            launch { offset.snapTo(offset.value + delta) }
+                            
+                            // Corectie: snapTo este suspend function, dar e rapid. 
+                            // Îl apelăm direct în buclă (awaitEachGesture este un suspend block).
+                            // try-catch pentru safety dacă animația e anulată
+                            try {
+                                offset.snapTo(offset.value + delta)
+                            } catch (e: Exception) {
+                                // ignore
+                            }
 
                             if (startPosRoot != Offset.Zero && mouthPosition != Offset.Zero) {
                                 val center = Offset(
@@ -648,35 +649,41 @@ private fun DraggableFoodIcon(
                         }
                     }
 
-                    // Release
-                    if (mouthPosition == Offset.Zero || startPosRoot == Offset.Zero) {
-                        launch { offset.animateTo(Offset.Zero, tween(220)) }
-                    } else {
-                        val center = Offset(
-                            x = startPosRoot.x + offset.value.x + halfPx,
-                            y = startPosRoot.y + offset.value.y + halfPx
-                        )
-                        val dx = center.x - mouthPosition.x
-                        val dy = center.y - mouthPosition.y
-                        val dist = sqrt(dx * dx + dy * dy)
-
-                        if (dist <= thresholdPx) {
-                            onFed()
-                            val targetOffset = Offset(
-                                x = (mouthPosition.x - startPosRoot.x - halfPx),
-                                y = (mouthPosition.y - startPosRoot.y - halfPx)
+                    // Release logic (verificăm unde am dat drumul)
+                    scope.launch {
+                        scale.animateTo(1f, tween(90))
+                        
+                        if (mouthPosition == Offset.Zero || startPosRoot == Offset.Zero) {
+                            offset.animateTo(Offset.Zero, tween(220))
+                        } else {
+                            val center = Offset(
+                                x = startPosRoot.x + offset.value.x + halfPx,
+                                y = startPosRoot.y + offset.value.y + halfPx
                             )
-                            launch {
+                            val dx = center.x - mouthPosition.x
+                            val dy = center.y - mouthPosition.y
+                            val dist = sqrt(dx * dx + dy * dy)
+
+                            if (dist <= thresholdPx) {
+                                onFed()
+                                val targetOffset = Offset(
+                                    x = (mouthPosition.x - startPosRoot.x - halfPx),
+                                    y = (mouthPosition.y - startPosRoot.y - halfPx)
+                                )
+                                // Suck into mouth
                                 offset.animateTo(targetOffset, tween(140))
                                 scale.animateTo(0.10f, tween(140))
+                                
+                                // Reset
                                 offset.snapTo(Offset.Zero)
                                 scale.snapTo(1f)
                                 visible = false
                                 delay(650)
                                 visible = true
+                            } else {
+                                // Snap back home
+                                offset.animateTo(Offset.Zero, tween(220))
                             }
-                        } else {
-                             launch { offset.animateTo(Offset.Zero, tween(220)) }
                         }
                     }
                 }
