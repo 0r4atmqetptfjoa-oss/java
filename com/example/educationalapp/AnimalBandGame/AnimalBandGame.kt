@@ -1,14 +1,13 @@
 package com.example.educationalapp
 
-import com.example.educationalapp.R
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -46,18 +45,8 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
-/**
- * AnimalBandGame - Mechanic Upgrade (spectaculos + stabilitate).
- *
- * - Fără "remove background alb": se presupune PNG-uri cu transparență (alpha).
- * - Metronom / Beat timing (Perfect / Good / Miss).
- * - Combo per muzicant + Jam Meter global + Final Jam (confetti + shockwave + flash).
- * - Particulele sunt randate pe Canvas (performanță, fără sute de Image() composables).
- * - Loop frame-synced (withFrameNanos) + dt capped.
- *
- * NOTE:
- * - Acest fișier nu include resurse (imagini). Folosește aceleași R.drawable.* din proiectul tău.
- */
+// --- NOTE: Toate clasele de jos au prefixul "Band" pentru a nu intra în conflict cu celelalte jocuri ---
+
 @Composable
 fun AnimalBandGame(onHome: () -> Unit = {}) {
     val context = LocalContext.current
@@ -66,10 +55,10 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     val bpm = 120f
     val beatPeriodNanos = remember(bpm) { (60_000_000_000f / bpm).toLong().coerceAtLeast(1L) }
 
-    // --- ROOT SIZE (pentru VFX spawn corect) ---
+    // --- ROOT SIZE ---
     var rootSizePx by remember { mutableStateOf(IntSize.Zero) }
 
-    // --- RESURSE (prelucrate off-main) ---
+    // --- RESURSE ---
     var frogFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
     var bearFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
     var catFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
@@ -84,27 +73,26 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     var bearCombo by remember { mutableIntStateOf(0) }
     var catCombo by remember { mutableIntStateOf(0) }
 
-    var frogLastHit by remember { mutableStateOf(HitQuality.NONE) }
-    var bearLastHit by remember { mutableStateOf(HitQuality.NONE) }
-    var catLastHit by remember { mutableStateOf(HitQuality.NONE) }
+    var frogLastHit by remember { mutableStateOf(BandHitQuality.NONE) }
+    var bearLastHit by remember { mutableStateOf(BandHitQuality.NONE) }
+    var catLastHit by remember { mutableStateOf(BandHitQuality.NONE) }
 
     var frogLastHitAt by remember { mutableStateOf(0L) }
     var bearLastHitAt by remember { mutableStateOf(0L) }
     var catLastHitAt by remember { mutableStateOf(0L) }
 
-    // Anchor (poziția de unde ies VFX) în coordonate Root
     var frogAnchor by remember { mutableStateOf(Offset.Zero) }
     var bearAnchor by remember { mutableStateOf(Offset.Zero) }
     var catAnchor by remember { mutableStateOf(Offset.Zero) }
 
     // --- VFX / GAME STATE ---
-    val particles = remember { mutableStateListOf<Particle>() }
-    val shockwaves = remember { mutableStateListOf<Shockwave>() }
+    val particles = remember { mutableStateListOf<BandParticle>() }
+    val shockwaves = remember { mutableStateListOf<BandShockwave>() }
 
-    var jam by remember { mutableStateOf(0f) } // 0..1
-    var screenFlash by remember { mutableStateOf(0f) } // 0..1
+    var jam by remember { mutableStateOf(0f) }
+    var screenFlash by remember { mutableStateOf(0f) }
     var isFinalJam by remember { mutableStateOf(false) }
-    var finalJamTimeLeft by remember { mutableStateOf(0f) } // seconds
+    var finalJamTimeLeft by remember { mutableStateOf(0f) }
 
     // Beat clock state
     var clockNanos by remember { mutableStateOf(0L) }
@@ -117,7 +105,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     // --- LOAD RESOURCES ---
     LaunchedEffect(Unit) {
         val (frog, bear, cat, note) = withContext(Dispatchers.Default) {
-            // Decode on IO, split on Default
             val frogSheet = withContext(Dispatchers.IO) {
                 BitmapFactory.decodeResource(context.resources, R.drawable.band_frog_sheet)
             }
@@ -135,7 +122,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             val bearFramesBmp = splitSpriteSheet(bearSheet, rows = 4, cols = 6, safetyCrop = true)
             val catFramesBmp = splitSpriteSheet(catSheet, rows = 4, cols = 6, safetyCrop = true)
 
-            Quad(
+            BandQuad(
                 frogFramesBmp.map { it.asImageBitmap() },
                 bearFramesBmp.map { it.asImageBitmap() },
                 catFramesBmp.map { it.asImageBitmap() },
@@ -166,17 +153,14 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
         }
     }
 
-    fun clampJam(v: Float): Float = v.coerceIn(0f, 1f)
-
     fun triggerFinalJam(center: Offset) {
         if (isFinalJam) return
         isFinalJam = true
         finalJamTimeLeft = 6.0f
         screenFlash = 1f
 
-        // Big shockwave + massive confetti
         shockwaves.add(
-            Shockwave(
+            BandShockwave(
                 center = center,
                 radius = 0f,
                 speed = 900f,
@@ -185,14 +169,13 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             )
         )
 
-        // Confetti burst
         repeat(220) {
-            particles.add(Particle.confettiBurst(center))
+            particles.add(BandParticle.confettiBurst(center))
         }
     }
 
     fun addJam(amount: Float) {
-        val next = clampJam(jam + amount)
+        val next = (jam + amount).coerceIn(0f, 1f)
         jam = next
         if (jam >= 1f && !isFinalJam) {
             val center = when {
@@ -209,46 +192,46 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
         if (anchor == Offset.Zero) return
         val count = (baseCount * (1f + energy * 1.25f)).roundToInt().coerceIn(1, 22)
         repeat(count) {
-            particles.add(Particle.note(anchor, jam = jam, finale = isFinalJam, extraScatter = extraScatter))
+            particles.add(BandParticle.note(anchor, jam = jam, finale = isFinalJam, extraScatter = extraScatter))
         }
     }
 
-    fun accentHit(anchor: Offset, quality: HitQuality, comboNow: Int) {
-        val comboBoost = (comboNow.coerceAtMost(20) / 20f) // 0..1
+    fun accentHit(anchor: Offset, quality: BandHitQuality, comboNow: Int) {
+        val comboBoost = (comboNow.coerceAtMost(20) / 20f)
         when (quality) {
-            HitQuality.PERFECT -> {
+            BandHitQuality.PERFECT -> {
                 screenFlash = maxOf(screenFlash, 0.70f)
-                shockwaves.add(Shockwave(center = anchor, radius = 0f, speed = 760f, width = 7.5f, alpha = 0.80f))
+                shockwaves.add(BandShockwave(center = anchor, radius = 0f, speed = 760f, width = 7.5f, alpha = 0.80f))
                 noteBurst(anchor, baseCount = 10 + (comboBoost * 6f).roundToInt(), energy = 1f + comboBoost * 0.6f, extraScatter = true)
             }
-            HitQuality.GOOD -> {
+            BandHitQuality.GOOD -> {
                 screenFlash = maxOf(screenFlash, 0.38f)
-                shockwaves.add(Shockwave(center = anchor, radius = 0f, speed = 560f, width = 5.5f, alpha = 0.60f))
+                shockwaves.add(BandShockwave(center = anchor, radius = 0f, speed = 560f, width = 5.5f, alpha = 0.60f))
                 noteBurst(anchor, baseCount = 6 + (comboBoost * 4f).roundToInt(), energy = 0.65f + comboBoost * 0.45f)
             }
-            HitQuality.MISS -> {
+            BandHitQuality.MISS -> {
                 screenFlash = maxOf(screenFlash, 0.12f)
                 noteBurst(anchor, baseCount = 3, energy = 0.25f)
             }
-            HitQuality.NONE -> Unit
+            BandHitQuality.NONE -> Unit
         }
     }
 
-    fun evaluateHit(nowNanos: Long): HitQuality {
-        if (nowNanos <= 0L) return HitQuality.NONE
-        val phase = (nowNanos % beatPeriodNanos).toDouble() / beatPeriodNanos.toDouble() // 0..1
+    fun evaluateHit(nowNanos: Long): BandHitQuality {
+        if (nowNanos <= 0L) return BandHitQuality.NONE
+        val phase = (nowNanos % beatPeriodNanos).toDouble() / beatPeriodNanos.toDouble()
         val distToBeat = min(phase, 1.0 - phase) * beatPeriodNanos.toDouble()
         val distMs = distToBeat / 1_000_000.0
         return when {
-            distMs <= 60.0 -> HitQuality.PERFECT
-            distMs <= 130.0 -> HitQuality.GOOD
-            else -> HitQuality.MISS
+            distMs <= 60.0 -> BandHitQuality.PERFECT
+            distMs <= 130.0 -> BandHitQuality.GOOD
+            else -> BandHitQuality.MISS
         }
     }
 
     fun applyHitToMusician(
         musician: MusicianId,
-        quality: HitQuality,
+        quality: BandHitQuality,
         anchor: Offset,
         nowNanos: Long
     ) {
@@ -259,9 +242,9 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 frogLastHit = quality
                 frogLastHitAt = nowNanos
                 frogCombo = when (quality) {
-                    HitQuality.PERFECT, HitQuality.GOOD -> (frogCombo + 1).coerceAtMost(999)
-                    HitQuality.MISS -> 0
-                    HitQuality.NONE -> frogCombo
+                    BandHitQuality.PERFECT, BandHitQuality.GOOD -> (frogCombo + 1).coerceAtMost(999)
+                    BandHitQuality.MISS -> 0
+                    BandHitQuality.NONE -> frogCombo
                 }
                 frogCombo
             }
@@ -269,9 +252,9 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 bearLastHit = quality
                 bearLastHitAt = nowNanos
                 bearCombo = when (quality) {
-                    HitQuality.PERFECT, HitQuality.GOOD -> (bearCombo + 1).coerceAtMost(999)
-                    HitQuality.MISS -> 0
-                    HitQuality.NONE -> bearCombo
+                    BandHitQuality.PERFECT, BandHitQuality.GOOD -> (bearCombo + 1).coerceAtMost(999)
+                    BandHitQuality.MISS -> 0
+                    BandHitQuality.NONE -> bearCombo
                 }
                 bearCombo
             }
@@ -279,25 +262,22 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 catLastHit = quality
                 catLastHitAt = nowNanos
                 catCombo = when (quality) {
-                    HitQuality.PERFECT, HitQuality.GOOD -> (catCombo + 1).coerceAtMost(999)
-                    HitQuality.MISS -> 0
-                    HitQuality.NONE -> catCombo
+                    BandHitQuality.PERFECT, BandHitQuality.GOOD -> (catCombo + 1).coerceAtMost(999)
+                    BandHitQuality.MISS -> 0
+                    BandHitQuality.NONE -> catCombo
                 }
                 catCombo
             }
         }
 
-        // Jam gain/loss (cu boost din combo)
         val comboBoost = 1f + (comboNow.coerceAtMost(20) / 20f) * 0.35f
         val base = when (quality) {
-            HitQuality.PERFECT -> 0.12f
-            HitQuality.GOOD -> 0.07f
-            HitQuality.MISS -> -0.04f
-            HitQuality.NONE -> 0f
+            BandHitQuality.PERFECT -> 0.12f
+            BandHitQuality.GOOD -> 0.07f
+            BandHitQuality.MISS -> -0.04f
+            BandHitQuality.NONE -> 0f
         }
         addJam(base * mult * comboBoost)
-
-        // VFX
         accentHit(anchor, quality, comboNow)
     }
 
@@ -332,7 +312,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
     fun onBeat() {
         val mult = synergyMultiplier()
 
-        // Groove: dacă muzicanții cântă, la fiecare beat ies note + se umple Jam (mai mic decât la tap).
         if (frogPlaying) {
             addJam(0.012f * mult)
             noteBurst(frogAnchor, baseCount = 2, energy = 0.3f)
@@ -346,7 +325,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             noteBurst(catAnchor, baseCount = 2, energy = 0.3f)
         }
 
-        // Final Jam intensifică pe beat
         if (isFinalJam) {
             val center = when {
                 bearAnchor != Offset.Zero -> bearAnchor
@@ -354,17 +332,17 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 catAnchor != Offset.Zero -> catAnchor
                 else -> Offset((rootSizePx.width * 0.5f), (rootSizePx.height * 0.5f))
             }
-            shockwaves.add(Shockwave(center = center, radius = 0f, speed = 980f, width = 9f, alpha = 0.55f))
+            shockwaves.add(BandShockwave(center = center, radius = 0f, speed = 980f, width = 9f, alpha = 0.55f))
 
             val widthPx = rootSizePx.width.toFloat().coerceAtLeast(1f)
             repeat(18) {
-                particles.add(Particle.confettiAmbient(widthPx))
+                particles.add(BandParticle.confettiAmbient(widthPx))
             }
             screenFlash = maxOf(screenFlash, 0.18f)
         }
     }
 
-    // --- MAIN FRAME LOOP (VFX + beat + finale) ---
+    // --- MAIN FRAME LOOP ---
     LaunchedEffect(Unit) {
         var lastFrame = 0L
         while (isActive) {
@@ -379,34 +357,29 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             val dt = ((now - lastFrame).toDouble() / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
             lastFrame = now
 
-            // Beat tick
             val beatIndex = now / beatPeriodNanos
             if (beatIndex != lastBeatIndex) {
                 lastBeatIndex = beatIndex
                 onBeat()
             }
 
-            // Update screen flash
             screenFlash = (screenFlash - dt * 1.7f).coerceIn(0f, 1f)
 
-            // Update finale timer
             if (isFinalJam) {
                 finalJamTimeLeft -= dt
                 if (finalJamTimeLeft <= 0f) {
                     isFinalJam = false
                     finalJamTimeLeft = 0f
-                    jam = 0.15f // un mic "afterglow"
+                    jam = 0.15f
                 }
             }
 
-            // Update shockwaves
             for (i in shockwaves.size - 1 downTo 0) {
                 val s = shockwaves[i]
                 s.update(dt)
                 if (!s.alive) shockwaves.removeAt(i)
             }
 
-            // Update particles (limit defensiv)
             val maxParticles = if (isFinalJam) 650 else 350
             if (particles.size > maxParticles) {
                 val removeCount = particles.size - maxParticles
@@ -428,7 +401,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             .onGloballyPositioned { rootSizePx = it.size },
         contentAlignment = Alignment.Center
     ) {
-        // A. FUNDAL (Scena)
+        // A. FUNDAL
         Image(
             painter = painterResource(id = R.drawable.bg_music_stage),
             contentDescription = null,
@@ -436,21 +409,20 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // B. Glow / Lights (în funcție de Jam)
+        // B. Glow
         val glowAlpha = (0.05f + jam * 0.10f + (if (isFinalJam) 0.12f else 0f)).coerceIn(0f, 0.35f)
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .alpha(glowAlpha)
         ) {
-            // bandă de lumină sus + un "spot" în centru
             drawRect(color = Color.White.copy(alpha = 0.22f), size = size.copy(height = size.height * 0.12f))
             val c = Offset(size.width * 0.5f, size.height * 0.45f)
             drawCircle(color = Color.White.copy(alpha = 0.18f), radius = min(size.width, size.height) * 0.38f, center = c)
         }
 
         // C. Beat Bar + Jam Meter
-        HudTop(
+        BandHudTop(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 10.dp, start = 12.dp, end = 12.dp),
@@ -459,7 +431,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             isFinalJam = isFinalJam
         )
 
-        // D. Band area (bounce pe beat)
+        // D. Band area
         val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (8f + jam * 14f) * (if (activeMusiciansCount() > 0) 1f else 0f))
         Row(
             modifier = Modifier
@@ -470,7 +442,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.Bottom
         ) {
-            // 1. Frog (Drums)
             MusicianCharacter(
                 frames = frogFrames,
                 isPlaying = frogPlaying,
@@ -483,7 +454,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 onDoubleTap = { onMusicianDoubleTap(MusicianId.FROG) }
             )
 
-            // 2. Bear (Trumpet)
             MusicianCharacter(
                 frames = bearFrames,
                 isPlaying = bearPlaying,
@@ -496,7 +466,6 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
                 onDoubleTap = { onMusicianDoubleTap(MusicianId.BEAR) }
             )
 
-            // 3. Cat (Guitar)
             MusicianCharacter(
                 frames = catFrames,
                 isPlaying = catPlaying,
@@ -510,14 +479,10 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             )
         }
 
-        // E. VFX layer (Canvas)
+        // E. VFX layer
         Canvas(modifier = Modifier.fillMaxSize()) {
             val note = noteImage
-
-            // Shockwaves
             shockwaves.forEach { it.draw(this) }
-
-            // Particles
             particles.forEach { p ->
                 p.draw(this, note)
             }
@@ -534,7 +499,7 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
             }
         }
 
-        // G. UI button Home (păstrat din proiect)
+        // G. Home button
         Image(
             painter = painterResource(id = R.drawable.ui_button_home),
             contentDescription = "Home",
@@ -560,23 +525,19 @@ fun AnimalBandGame(onHome: () -> Unit = {}) {
 }
 
 @Composable
-private fun HudTop(
+private fun BandHudTop(
     modifier: Modifier,
     beatPhase: Float,
     jam: Float,
     isFinalJam: Boolean
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        // Beat bar
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(20.dp)
         ) {
-            // Background
             drawRect(Color.Black.copy(alpha = 0.25f), size = size)
-
-            // Tick marks
             val ticks = 8
             val dx = size.width / ticks
             for (i in 0..ticks) {
@@ -588,8 +549,6 @@ private fun HudTop(
                     strokeWidth = 1f
                 )
             }
-
-            // Moving indicator
             val x = (beatPhase.coerceIn(0f, 1f)) * size.width
             drawLine(
                 color = if (isFinalJam) Color.White else Color.White.copy(alpha = 0.85f),
@@ -601,7 +560,6 @@ private fun HudTop(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Jam meter
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -619,28 +577,20 @@ private fun HudTop(
 
 private enum class MusicianId { FROG, BEAR, CAT }
 
-private enum class HitQuality(val label: String, val color: Color) {
+private enum class BandHitQuality(val label: String, val color: Color) {
     PERFECT("Perfect", Color(0xFF00E5FF)),
     GOOD("Good", Color(0xFFFFEB3B)),
     MISS("Miss", Color(0xFFFF5252)),
     NONE("", Color.Transparent)
 }
 
-/**
- * Muzicant (sprite sheet) + overlay UI (combo + last hit).
- *
- * Click:
- *  - pornește (dacă era oprit) și e evaluat timingul (Perfect/Good/Miss).
- * Double-click:
- *  - oprește muzicantul.
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MusicianCharacter(
     frames: List<ImageBitmap>,
     isPlaying: Boolean,
     combo: Int,
-    lastHit: HitQuality,
+    lastHit: BandHitQuality,
     lastHitAtNanos: Long,
     label: String,
     onAnchor: (Offset) -> Unit,
@@ -651,7 +601,6 @@ private fun MusicianCharacter(
     val scaleAnim = remember { Animatable(1f) }
     var currentFrame by remember { mutableIntStateOf(0) }
 
-    // Frame animator (frame-synced)
     LaunchedEffect(frames, isPlaying) {
         if (frames.isEmpty()) return@LaunchedEffect
         var last = 0L
@@ -680,7 +629,6 @@ private fun MusicianCharacter(
         }
     }
 
-    // Micro feedback la start/stop
     LaunchedEffect(isPlaying) {
         scaleAnim.animateTo(0.95f, animationSpec = tween(70))
         scaleAnim.animateTo(1f, animationSpec = tween(90))
@@ -693,18 +641,12 @@ private fun MusicianCharacter(
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = {
-                    // micro feedback la click
-                    onClick()
-                },
-                onDoubleClick = {
-                    onDoubleTap()
-                }
+                onClick = { onClick() },
+                onDoubleClick = { onDoubleTap() }
             )
             .onGloballyPositioned { coordinates ->
                 val pos = coordinates.positionInRoot()
                 val size = coordinates.size
-                // Anchor: aproximăm instrumentul în partea dreaptă / sus a personajului
                 val ax = pos.x + size.width * 0.72f
                 val ay = pos.y + size.height * 0.45f
                 onAnchor(Offset(ax, ay))
@@ -721,7 +663,6 @@ private fun MusicianCharacter(
             Text("Loading...", color = Color.White)
         }
 
-        // Overlay: combo + last hit
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -734,7 +675,7 @@ private fun MusicianCharacter(
                     color = Color.White
                 )
             }
-            val showHit = lastHit != HitQuality.NONE && (System.nanoTime() - lastHitAtNanos) < 900_000_000L
+            val showHit = lastHit != BandHitQuality.NONE && (System.nanoTime() - lastHitAtNanos) < 900_000_000L
             if (showHit) {
                 Text(
                     text = lastHit.label,
@@ -745,10 +686,6 @@ private fun MusicianCharacter(
     }
 }
 
-/**
- * Split simplu sprite-sheet în frames.
- * safetyCrop = true: taie 1px margine (ajută dacă sheet-ul are "bleeding").
- */
 private fun splitSpriteSheet(
     sheet: Bitmap,
     rows: Int,
@@ -774,14 +711,9 @@ private fun splitSpriteSheet(
     return out
 }
 
-private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+private data class BandQuad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
-/**
- * Particule VFX.
- * - NOTE: folosește imaginea notei (tint dinamic + rotație).
- * - CONFETTI: dreptunghiuri colorate + rotație.
- */
-private class Particle private constructor(
+private class BandParticle private constructor(
     private val kind: Kind,
     private var x: Float,
     private var y: Float,
@@ -812,7 +744,6 @@ private class Particle private constructor(
             return
         }
 
-        // Basic physics
         val dragFactor = (1f - drag * dt).coerceIn(0.0f, 1.0f)
         vx *= dragFactor
         vy = (vy + gravity * dt) * dragFactor
@@ -823,7 +754,6 @@ private class Particle private constructor(
         rotationDeg += rotationSpeedDeg * dt
 
         if (kind == Kind.NOTE) {
-            // gentle wave sideways around baseX
             x = baseX + (sin(age * waveFreq) * waveAmp)
         }
     }
@@ -851,7 +781,6 @@ private class Particle private constructor(
                     )
                 }
 
-                // subtle sparkle
                 if (alpha > 0.25f) {
                     scope.drawCircle(
                         color = color.copy(alpha = alpha * 0.35f),
@@ -880,16 +809,11 @@ private class Particle private constructor(
 
     companion object {
         private val palette = listOf(
-            Color(0xFFFFEB3B), // Galben
-            Color(0xFF03A9F4), // Albastru
-            Color(0xFFFF4081), // Roz
-            Color(0xFF4CAF50), // Verde
-            Color(0xFFFF9800), // Portocaliu
-            Color(0xFFB388FF), // Mov
-            Color(0xFF69F0AE)  // Mint
+            Color(0xFFFFEB3B), Color(0xFF03A9F4), Color(0xFFFF4081),
+            Color(0xFF4CAF50), Color(0xFFFF9800), Color(0xFFB388FF), Color(0xFF69F0AE)
         )
 
-        fun note(origin: Offset, jam: Float, finale: Boolean, extraScatter: Boolean): Particle {
+        fun note(origin: Offset, jam: Float, finale: Boolean, extraScatter: Boolean): BandParticle {
             val energy = (0.25f + jam * 1.0f + (if (finale) 0.65f else 0f)).coerceIn(0.25f, 1.75f)
             val spread = if (extraScatter) 0.80 else 0.55
             val angle = (-PI / 2 + Random.nextDouble(-spread, spread)).toFloat()
@@ -900,86 +824,56 @@ private class Particle private constructor(
             val life = (1.0f + Random.nextFloat() * 0.7f) * (if (finale) 1.15f else 1f)
             val waveAmp = 8f + Random.nextFloat() * 18f
             val waveFreq = 6f + Random.nextFloat() * 7f
-            return Particle(
+            return BandParticle(
                 kind = Kind.NOTE,
-                x = origin.x,
-                y = origin.y,
-                vx = vx,
-                vy = vy,
-                baseX = origin.x,
-                waveAmp = waveAmp,
-                waveFreq = waveFreq,
+                x = origin.x, y = origin.y, vx = vx, vy = vy, baseX = origin.x,
+                waveAmp = waveAmp, waveFreq = waveFreq,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-240f + Random.nextFloat() * 480f),
-                size = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = -40f, // notes float up, so slight negative gravity
-                drag = 0.22f
+                size = size, life = life, age = 0f,
+                color = palette.random(), gravity = -40f, drag = 0.22f
             )
         }
 
-        fun confettiBurst(center: Offset): Particle {
+        fun confettiBurst(center: Offset): BandParticle {
             val angle = Random.nextDouble(0.0, 2.0 * PI).toFloat()
             val speed = 240f + Random.nextFloat() * 720f
             val vx = cos(angle) * speed
             val vy = sin(angle) * speed - 260f
             val size = 10f + Random.nextFloat() * 14f
             val life = 1.6f + Random.nextFloat() * 1.4f
-            return Particle(
+            return BandParticle(
                 kind = Kind.CONFETTI,
-                x = center.x,
-                y = center.y,
-                vx = vx,
-                vy = vy,
-                baseX = center.x,
-                waveAmp = 0f,
-                waveFreq = 0f,
+                x = center.x, y = center.y, vx = vx, vy = vy, baseX = center.x,
+                waveAmp = 0f, waveFreq = 0f,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-360f + Random.nextFloat() * 720f),
-                size = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = 880f,
-                drag = 0.08f
+                size = size, life = life, age = 0f,
+                color = palette.random(), gravity = 880f, drag = 0.08f
             )
         }
 
-        fun confettiAmbient(rootWidthPx: Float): Particle {
+        fun confettiAmbient(rootWidthPx: Float): BandParticle {
             val x = Random.nextFloat() * rootWidthPx
             val y = -40f
             val vx = (-80f + Random.nextFloat() * 160f)
             val vy = (70f + Random.nextFloat() * 230f)
             val size = 9f + Random.nextFloat() * 10f
             val life = 1.3f + Random.nextFloat() * 1.0f
-            return Particle(
+            return BandParticle(
                 kind = Kind.CONFETTI,
-                x = x,
-                y = y,
-                vx = vx,
-                vy = vy,
-                baseX = x,
-                waveAmp = 0f,
-                waveFreq = 0f,
+                x = x, y = y, vx = vx, vy = vy, baseX = x,
+                waveAmp = 0f, waveFreq = 0f,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-260f + Random.nextFloat() * 520f),
-                size = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = 920f,
-                drag = 0.06f
+                size = size, life = life, age = 0f,
+                color = palette.random(), gravity = 920f, drag = 0.06f
             )
         }
     }
 }
 
-/**
- * Shockwave ring (cerc expandabil).
- */
-private class Shockwave(
+private class BandShockwave(
     private val center: Offset,
     private var radius: Float,
     private val speed: Float,

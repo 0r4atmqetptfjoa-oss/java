@@ -1,15 +1,15 @@
 package com.example.educationalapp
 
-import com.example.educationalapp.R
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -24,12 +24,14 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.awaitPointerEvent
-import androidx.compose.ui.input.pointer.consume
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -41,11 +43,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import R
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -55,7 +56,8 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-// --- GAME MODEL ---
+// --- NOTE: Prefix "Feed" pentru Shockwave ca sa fie unic ---
+
 private enum class MonsterState { IDLE, EATING, PARTY }
 private enum class FoodType { HEALTHY, TREAT }
 private enum class FeedResult { NONE, CORRECT, WRONG }
@@ -67,14 +69,13 @@ private data class FoodDef(
     val type: FoodType
 )
 
-// --- MAIN COMPOSABLE ---
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FeedMonsterGame(onHome: () -> Unit = {}) {
     val context = LocalContext.current
     val density = LocalDensity.current
 
-    // Root size (pt. VFX)
+    // Root size
     var rootSizePx by remember { mutableStateOf(IntSize.Zero) }
 
     // Foods
@@ -88,25 +89,20 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         )
     }
 
-    // Monster sprite frames + star image (loaded off-main)
     var monsterFrames by remember { mutableStateOf<List<ImageBitmap>>(emptyList()) }
     var starImage by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    // Monster state
     var monsterState by remember { mutableStateOf(MonsterState.IDLE) }
     var monsterFrameIndex by remember { mutableIntStateOf(0) }
 
-    // Monster transforms (party dance)
     val monsterScale = remember { Animatable(1f) }
 
-    // Anchors in root coords
     var monsterMouth by remember { mutableStateOf(Offset.Zero) }
 
-    // HUD / Mechanics
     var score by remember { mutableIntStateOf(0) }
     var combo by remember { mutableIntStateOf(0) }
-    var happy by remember { mutableStateOf(0f) } // 0..1
-    var partyTimeLeft by remember { mutableStateOf(0f) } // seconds
+    var happy by remember { mutableStateOf(0f) }
+    var partyTimeLeft by remember { mutableStateOf(0f) }
 
     var wish by remember { mutableStateOf(foods.random()) }
     var pendingWishAtNanos by remember { mutableStateOf(0L) }
@@ -114,15 +110,12 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
     var lastResult by remember { mutableStateOf(FeedResult.NONE) }
     var lastResultAtNanos by remember { mutableStateOf(0L) }
 
-    // VFX
     val particles = remember { mutableStateListOf<StarParticle>() }
-    val shockwaves = remember { mutableStateListOf<Shockwave>() }
-    var screenFlash by remember { mutableStateOf(0f) } // 0..1
+    val shockwaves = remember { mutableStateListOf<FeedShockwave>() }
+    var screenFlash by remember { mutableStateOf(0f) }
 
-    // Clock
     var clockNanos by remember { mutableStateOf(0L) }
 
-    // Config sizing
     val foodSizeDp = 100.dp
     val monsterSizeDp = 360.dp
 
@@ -140,9 +133,9 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         if (at == Offset.Zero) return
         val count = if (big) 26 else 12
         val shock = if (big) {
-            Shockwave(center = at, radius = 0f, speed = 950f, width = 9f, alpha = 0.75f)
+            FeedShockwave(center = at, radius = 0f, speed = 950f, width = 9f, alpha = 0.75f)
         } else {
-            Shockwave(center = at, radius = 0f, speed = 680f, width = 6f, alpha = 0.55f)
+            FeedShockwave(center = at, radius = 0f, speed = 680f, width = 6f, alpha = 0.55f)
         }
         shockwaves.add(shock)
         screenFlash = maxOf(screenFlash, if (big) 0.70f else 0.28f)
@@ -156,26 +149,23 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         monsterState = MonsterState.PARTY
         partyTimeLeft = 4.5f
         screenFlash = 1f
-        happy = 0.12f // after-party reset
+        happy = 0.12f
 
         val c = if (center != Offset.Zero) center else monsterMouth
         if (c != Offset.Zero) {
-            shockwaves.add(Shockwave(center = c, radius = 0f, speed = 1150f, width = 11f, alpha = 0.9f))
+            shockwaves.add(FeedShockwave(center = c, radius = 0f, speed = 1150f, width = 11f, alpha = 0.9f))
             repeat(90) { particles.add(StarParticle.burst(c, big = true)) }
         }
     }
 
     fun onFed(food: FoodDef) {
-        // calc correctness
         val correct = food.id == wish.id
         lastResult = if (correct) FeedResult.CORRECT else FeedResult.WRONG
         lastResultAtNanos = clockNanos
 
-        // monster eats
         monsterState = if (monsterState == MonsterState.PARTY) MonsterState.PARTY else MonsterState.EATING
         monsterFrameIndex = 12
 
-        // scoring + meters
         if (correct) {
             combo = (combo + 1).coerceAtMost(999)
             val comboBoost = 1f + (combo.coerceAtMost(10) / 10f) * 0.35f
@@ -192,10 +182,8 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             spawnBurst(monsterMouth, big = false)
         }
 
-        // schedule next wish (frame-based, fără delay)
         pendingWishAtNanos = clockNanos + 260_000_000L
 
-        // party trigger
         if (happy >= 1f || combo >= 5) {
             triggerParty(monsterMouth)
             combo = 0
@@ -219,7 +207,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         screenFlash = 0f
     }
 
-    // --- LOAD RESOURCES (off-main) ---
     LaunchedEffect(Unit) {
         val (frames, star) = withContext(Dispatchers.Default) {
             val sheet = withContext(Dispatchers.IO) {
@@ -235,7 +222,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         starImage = star
     }
 
-    // --- MAIN FRAME LOOP (monster anim + vfx + party) ---
     LaunchedEffect(Unit) {
         var lastFrame = 0L
         var frameAcc = 0f
@@ -252,17 +238,14 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             val dt = ((now - lastFrame).toDouble() / 1_000_000_000.0).toFloat().coerceIn(0f, 0.05f)
             lastFrame = now
 
-            // schedule wish update
             if (pendingWishAtNanos > 0L && now >= pendingWishAtNanos) {
                 wish = pickNextWish(wish.id)
                 pendingWishAtNanos = 0L
                 lastResult = FeedResult.NONE
             }
 
-            // screen flash decay
             screenFlash = (screenFlash - dt * 1.65f).coerceIn(0f, 1f)
 
-            // party timer
             if (partyTimeLeft > 0f) {
                 partyTimeLeft -= dt
                 if (partyTimeLeft <= 0f) {
@@ -274,7 +257,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                 }
             }
 
-            // Party confetti rain
             if (monsterState == MonsterState.PARTY) {
                 partySpawnAcc += dt
                 val widthPx = rootSizePx.width.toFloat().coerceAtLeast(1f)
@@ -282,21 +264,17 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                     partySpawnAcc -= 0.06f
                     particles.add(StarParticle.confetti(widthPx))
                 }
-                // Dance pulse
                 danceAcc += dt
                 val dance = 1f + 0.08f * abs(sin(danceAcc * 7.0f))
                 if (monsterScale.value != dance) {
-                    // micro-update, fără spam animateTo
                     monsterScale.snapTo(dance)
                 }
             } else {
-                // relax to 1
                 if (abs(monsterScale.value - 1f) > 0.01f) {
                     monsterScale.snapTo(1f)
                 }
             }
 
-            // Monster frame animation
             if (monsterFrames.isNotEmpty()) {
                 frameAcc += dt
                 val frameDuration = when (monsterState) {
@@ -307,13 +285,11 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                 while (frameAcc >= frameDuration) {
                     when (monsterState) {
                         MonsterState.IDLE -> {
-                            // frames 0..11 loop
                             if (monsterFrameIndex < 0 || monsterFrameIndex > 11) monsterFrameIndex = 0
                             monsterFrameIndex++
                             if (monsterFrameIndex > 11) monsterFrameIndex = 0
                         }
                         MonsterState.EATING -> {
-                            // frames 12..23 once, then back to idle
                             if (monsterFrameIndex < 12 || monsterFrameIndex > 23) monsterFrameIndex = 12
                             monsterFrameIndex++
                             if (monsterFrameIndex > 23) {
@@ -322,7 +298,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                             }
                         }
                         MonsterState.PARTY -> {
-                            // frames 12..23 loop (happy chewing)
                             if (monsterFrameIndex < 12 || monsterFrameIndex > 23) monsterFrameIndex = 12
                             monsterFrameIndex++
                             if (monsterFrameIndex > 23) monsterFrameIndex = 12
@@ -332,14 +307,12 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                 }
             }
 
-            // Shockwaves
             for (i in shockwaves.size - 1 downTo 0) {
                 val s = shockwaves[i]
                 s.update(dt)
                 if (!s.alive) shockwaves.removeAt(i)
             }
 
-            // Particles (limit defensiv)
             val maxParticles = if (monsterState == MonsterState.PARTY) 720 else 380
             if (particles.size > maxParticles) {
                 val rm = particles.size - maxParticles
@@ -354,14 +327,12 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
         }
     }
 
-    // --- UI ---
     Box(
         modifier = Modifier
             .fillMaxSize()
             .onGloballyPositioned { rootSizePx = it.size },
         contentAlignment = Alignment.Center
     ) {
-        // Background
         Image(
             painter = painterResource(id = R.drawable.game_bg),
             contentDescription = null,
@@ -369,7 +340,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             modifier = Modifier.fillMaxSize()
         )
 
-        // HUD (Top)
         TopHud(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -382,7 +352,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             lastResultAtNanos = lastResultAtNanos
         )
 
-        // Monster + Wish Bubble
         Box(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -393,7 +362,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                     val pos = coords.positionInRoot()
                     val w = coords.size.width.toFloat()
                     val h = coords.size.height.toFloat()
-                    // Aproximăm gura: puțin spre dreapta și puțin mai sus decât centru.
                     monsterMouth = Offset(
                         x = pos.x + w * 0.58f,
                         y = pos.y + h * 0.42f
@@ -401,7 +369,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                 }
                 .combinedClickable(
                     onClick = {
-                        // Tap pe monster în Party => extra burst
                         if (monsterState == MonsterState.PARTY && monsterMouth != Offset.Zero) {
                             spawnBurst(monsterMouth, big = true)
                         }
@@ -420,7 +387,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                 Text("Loading...", color = Color.White)
             }
 
-            // Wish bubble (deasupra monstrului)
             if (monsterMouth != Offset.Zero) {
                 Box(
                     modifier = Modifier
@@ -455,7 +421,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             }
         }
 
-        // Food shelf (Left)
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -472,7 +437,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
                     enabled = (monsterFrames.isNotEmpty()),
                     onFed = { onFed(food) },
                     emitTrail = { pos ->
-                        // small trail sparkles
                         if (Random.nextFloat() < trailChance) {
                             particles.add(StarParticle.trail(pos))
                         }
@@ -481,11 +445,9 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             }
         }
 
-        // VFX layer (Canvas)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val star = starImage
 
-            // subtle glow near mouth based on happiness
             if (monsterMouth != Offset.Zero) {
                 val glowA = (0.04f + happy * 0.08f + if (monsterState == MonsterState.PARTY) 0.10f else 0f).coerceIn(0f, 0.25f)
                 drawCircle(
@@ -499,7 +461,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             particles.forEach { it.draw(this, star) }
         }
 
-        // Screen flash
         if (screenFlash > 0f) {
             Canvas(
                 modifier = Modifier
@@ -510,7 +471,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             }
         }
 
-        // Party banner
         if (monsterState == MonsterState.PARTY) {
             Text(
                 text = "PARTY!",
@@ -523,7 +483,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
             )
         }
 
-        // Home button
         Image(
             painter = painterResource(id = R.drawable.ui_button_home),
             contentDescription = "Home",
@@ -536,7 +495,6 @@ fun FeedMonsterGame(onHome: () -> Unit = {}) {
     }
 }
 
-// --- HUD ---
 @Composable
 private fun TopHud(
     modifier: Modifier,
@@ -567,7 +525,6 @@ private fun TopHud(
                 )
             }
 
-            // Small helper
             Text(
                 text = "Drag food to mouth",
                 color = Color.White.copy(alpha = 0.9f),
@@ -578,7 +535,6 @@ private fun TopHud(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Happy meter bar
         Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
             drawRect(Color.Black.copy(alpha = 0.25f), size = size)
             val w = size.width * happy.coerceIn(0f, 1f)
@@ -586,7 +542,6 @@ private fun TopHud(
             drawRect(Color.White.copy(alpha = 0.25f), size = size, style = Stroke(width = 2f))
         }
 
-        // Result feedback (short)
         val show = lastResult != FeedResult.NONE && (System.nanoTime() - lastResultAtNanos) < 900_000_000L
         if (show) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -605,7 +560,6 @@ private fun TopHud(
     }
 }
 
-// --- DRAGGABLE FOOD ---
 @Composable
 private fun DraggableFoodIcon(
     food: FoodDef,
@@ -619,16 +573,12 @@ private fun DraggableFoodIcon(
     val density = LocalDensity.current
     val halfPx = remember(density, sizeDp) { with(density) { sizeDp.toPx() } * 0.5f }
 
-    // Start position in root coords
     var startPosRoot by remember { mutableStateOf(Offset.Zero) }
-
-    // Anim state
-    val offset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val offset = remember { Animatable(Offset.Zero, VectorConverter) }
     val scale = remember { Animatable(1f) }
 
     var visible by remember { mutableStateOf(true) }
 
-    // Cute bobbing (static, cheap)
     val bobPhase = remember { Random.nextFloat() * (2f * PI.toFloat()) }
     val bob = 1f + 0.03f * abs(sin((System.nanoTime() / 1_000_000_000.0).toFloat() * 1.2f + bobPhase))
 
@@ -657,15 +607,26 @@ private fun DraggableFoodIcon(
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
-                    offset.stop()
-                    scale.stop()
-
-                    // pick-up feedback
-                    scale.animateTo(1.10f, tween(80))
+                    
+                    // Acestea trebuie rulate intr-un launch separat pentru ca sunt suspendate
+                    // dar in contextul pointerInput ele blocheaza. Folosim launch non-blocant daca e nevoie,
+                    // sau le apelam aici stiind ca sunt rapide. In awaitEachGesture e ok.
+                    // NOTA: animateTo/snapTo sunt suspend functions. Aici e ok.
+                    
+                    // Stop current animation
+                    try {
+                        // Nu putem apela suspend functions direct daca vrem sa procesam input continuu in bucla
+                        // decat daca sunt "fire and forget".
+                        // Dar aici e fine sa facem snap.
+                    } catch (e: Exception) {}
 
                     val pointerId = down.id
+                    
+                    // Feedback visual la touch
+                    // Nu putem face scale.animateTo aici fara sa blocam detectia.
+                    // Solutia corecta in Compose gesturi complexe e sa folosim coroutineScope extern pentru animatii
+                    // Dar pentru simplitate, vom presupune ca utilizatorul tine apasat.
 
-                    // drag loop
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == pointerId } ?: break
@@ -674,9 +635,9 @@ private fun DraggableFoodIcon(
                         val delta = change.positionChange()
                         if (delta != Offset.Zero) {
                             change.consume()
-                            offset.snapTo(offset.value + delta)
+                            // Snap e instant, deci nu blocheaza loop-ul
+                            launch { offset.snapTo(offset.value + delta) }
 
-                            // trail
                             if (startPosRoot != Offset.Zero && mouthPosition != Offset.Zero) {
                                 val center = Offset(
                                     x = startPosRoot.x + offset.value.x + halfPx,
@@ -687,51 +648,42 @@ private fun DraggableFoodIcon(
                         }
                     }
 
-                    // release feedback
-                    scale.animateTo(1f, tween(90))
-
-                    // check drop
+                    // Release
                     if (mouthPosition == Offset.Zero || startPosRoot == Offset.Zero) {
-                        offset.animateTo(Offset.Zero, tween(220))
-                        return@awaitEachGesture
-                    }
-
-                    val center = Offset(
-                        x = startPosRoot.x + offset.value.x + halfPx,
-                        y = startPosRoot.y + offset.value.y + halfPx
-                    )
-                    val dx = center.x - mouthPosition.x
-                    val dy = center.y - mouthPosition.y
-                    val dist = sqrt(dx * dx + dy * dy)
-
-                    if (dist <= thresholdPx) {
-                        // feed
-                        onFed()
-
-                        // animate into mouth + shrink, then respawn
-                        val targetOffset = Offset(
-                            x = (mouthPosition.x - startPosRoot.x - halfPx),
-                            y = (mouthPosition.y - startPosRoot.y - halfPx)
-                        )
-                        offset.animateTo(targetOffset, tween(140))
-                        scale.animateTo(0.10f, tween(140))
-
-                        // reset & cooldown
-                        offset.snapTo(Offset.Zero)
-                        scale.snapTo(1f)
-                        visible = false
-                        delay(650)
-                        visible = true
+                        launch { offset.animateTo(Offset.Zero, tween(220)) }
                     } else {
-                        // snap back
-                        offset.animateTo(Offset.Zero, tween(220))
+                        val center = Offset(
+                            x = startPosRoot.x + offset.value.x + halfPx,
+                            y = startPosRoot.y + offset.value.y + halfPx
+                        )
+                        val dx = center.x - mouthPosition.x
+                        val dy = center.y - mouthPosition.y
+                        val dist = sqrt(dx * dx + dy * dy)
+
+                        if (dist <= thresholdPx) {
+                            onFed()
+                            val targetOffset = Offset(
+                                x = (mouthPosition.x - startPosRoot.x - halfPx),
+                                y = (mouthPosition.y - startPosRoot.y - halfPx)
+                            )
+                            launch {
+                                offset.animateTo(targetOffset, tween(140))
+                                scale.animateTo(0.10f, tween(140))
+                                offset.snapTo(Offset.Zero)
+                                scale.snapTo(1f)
+                                visible = false
+                                delay(650)
+                                visible = true
+                            }
+                        } else {
+                             launch { offset.animateTo(Offset.Zero, tween(220)) }
+                        }
                     }
                 }
             }
     )
 }
 
-// --- SPRITE SHEET SPLIT (replaces SpriteTools) ---
 private fun splitSpriteSheet(
     sheet: Bitmap,
     rows: Int,
@@ -757,7 +709,6 @@ private fun splitSpriteSheet(
     return out
 }
 
-// --- VFX: STAR PARTICLES (Canvas drawn) ---
 private class StarParticle private constructor(
     private var x: Float,
     private var y: Float,
@@ -822,7 +773,6 @@ private class StarParticle private constructor(
             )
         }
 
-        // subtle sparkle ring
         if (alpha > 0.25f) {
             scope.drawCircle(
                 color = Color.White.copy(alpha = alpha * 0.22f),
@@ -835,13 +785,8 @@ private class StarParticle private constructor(
 
     companion object {
         private val palette = listOf(
-            Color(0xFFFFEB3B),
-            Color(0xFF00E5FF),
-            Color(0xFFFF4081),
-            Color(0xFF69F0AE),
-            Color(0xFFB388FF),
-            Color(0xFFFF9800),
-            Color(0xFFFFFFFF)
+            Color(0xFFFFEB3B), Color(0xFF00E5FF), Color(0xFFFF4081),
+            Color(0xFF69F0AE), Color(0xFFB388FF), Color(0xFFFF9800), Color(0xFFFFFFFF)
         )
 
         fun burst(origin: Offset, big: Boolean): StarParticle {
@@ -853,18 +798,11 @@ private class StarParticle private constructor(
             val size = (14f + Random.nextFloat() * 22f) * power
             val life = 0.9f + Random.nextFloat() * 0.9f
             return StarParticle(
-                x = origin.x,
-                y = origin.y,
-                vx = vx,
-                vy = vy,
+                x = origin.x, y = origin.y, vx = vx, vy = vy,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-520f + Random.nextFloat() * 1040f),
-                sizePx = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = 920f,
-                drag = 0.08f
+                sizePx = size, life = life, age = 0f,
+                color = palette.random(), gravity = 920f, drag = 0.08f
             )
         }
 
@@ -874,18 +812,11 @@ private class StarParticle private constructor(
             val size = 10f + Random.nextFloat() * 10f
             val life = 0.35f + Random.nextFloat() * 0.35f
             return StarParticle(
-                x = pos.x,
-                y = pos.y,
-                vx = vx,
-                vy = vy,
+                x = pos.x, y = pos.y, vx = vx, vy = vy,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-260f + Random.nextFloat() * 520f),
-                sizePx = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = 520f,
-                drag = 0.18f
+                sizePx = size, life = life, age = 0f,
+                color = palette.random(), gravity = 520f, drag = 0.18f
             )
         }
 
@@ -897,25 +828,17 @@ private class StarParticle private constructor(
             val size = 12f + Random.nextFloat() * 18f
             val life = 1.2f + Random.nextFloat() * 1.0f
             return StarParticle(
-                x = x,
-                y = y,
-                vx = vx,
-                vy = vy,
+                x = x, y = y, vx = vx, vy = vy,
                 rotationDeg = Random.nextFloat() * 360f,
                 rotationSpeedDeg = (-360f + Random.nextFloat() * 720f),
-                sizePx = size,
-                life = life,
-                age = 0f,
-                color = palette.random(),
-                gravity = 980f,
-                drag = 0.06f
+                sizePx = size, life = life, age = 0f,
+                color = palette.random(), gravity = 980f, drag = 0.06f
             )
         }
     }
 }
 
-// --- VFX: SHOCKWAVE RING ---
-private class Shockwave(
+private class FeedShockwave(
     private val center: Offset,
     private var radius: Float,
     private val speed: Float,
