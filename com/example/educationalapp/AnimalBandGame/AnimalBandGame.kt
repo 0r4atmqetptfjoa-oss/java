@@ -30,8 +30,7 @@ import com.example.educationalapp.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withFrameNanos
-import kotlin.random.Random
+import androidx.compose.runtime.withFrameNanos // <--- IMPORTUL CORECT
 import kotlin.math.sin
 import kotlin.math.cos
 import kotlin.math.abs
@@ -53,6 +52,7 @@ fun AnimalBandGame(
 
     // VFX
     val particles = remember { mutableStateListOf<BandParticle>() }
+    val shockwaves = remember { mutableStateListOf<BandShockwave>() }
     var rootSizePx by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     
     // Ancore pentru particule
@@ -112,10 +112,13 @@ fun AnimalBandGame(
 
             if (viewModel.jam >= 1f && !viewModel.isFinalJam) {
                 viewModel.isFinalJam = true
+                shockwaves.add(BandShockwave(Offset(rootSizePx.width/2f, rootSizePx.height/2f), 0f, 1000f, 20f, 1f))
             }
             
             particles.removeAll { !it.alive }
             particles.forEach { it.update(dt) }
+            shockwaves.removeAll { !it.alive }
+            shockwaves.forEach { it.update(dt) }
         }
     }
 
@@ -165,6 +168,7 @@ fun AnimalBandGame(
             // VFX
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val note = noteImage
+                shockwaves.forEach { it.draw(this) }
                 particles.forEach { it.draw(this, note) }
             }
         }
@@ -227,8 +231,7 @@ fun MusicianView(
                 onDoubleClick = onDouble
             )
             .onGloballyPositioned {
-                // Simplificat pentru exemplu: presupunem ancora la mijlocul cutiei
-                // Ideal se calculeaza pozitia globala
+                onAnchor(it.parentCoordinates?.localToWindow(it.localToWindow(Offset.Zero)) ?: Offset.Zero)
             },
         contentAlignment = Alignment.Center
     ) {
@@ -278,4 +281,10 @@ class BandParticle(var x: Float, var y: Float) {
         if(img != null) scope.drawImage(img, Offset(x, y), alpha = 1f - age)
     }
     companion object { fun note(pos: Offset) = BandParticle(pos.x, pos.y) }
+}
+
+class BandShockwave(val center: Offset, var radius: Float, val speed: Float, val width: Float, var alpha: Float) { 
+    var alive = true
+    fun update(dt: Float) { radius += speed * dt; alpha -= dt; if(alpha<=0) alive=false }
+    fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope) { scope.drawCircle(Color.White.copy(alpha.coerceIn(0f,1f)), radius, center, style = Stroke(width)) }
 }
