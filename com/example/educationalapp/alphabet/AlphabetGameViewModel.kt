@@ -32,26 +32,32 @@ data class AlphabetGameUiState(
 class AlphabetGameViewModel @Inject constructor() : ViewModel() {
 
     private val MAX_ATTEMPTS = 2
-
-    /**
-     * Folosim un „deck” (listă amestecată) ca să evităm repetarea întrebărilor în aceeași sesiune.
-     */
     private var questionDeck: List<AlphabetItem> = emptyList()
 
-    private val _uiState: MutableStateFlow<AlphabetGameUiState> = MutableStateFlow(createInitialState())
+    private val _uiState: MutableStateFlow<AlphabetGameUiState> = MutableStateFlow(createInitialState(true))
     val uiState: StateFlow<AlphabetGameUiState> = _uiState
 
     private fun buildDeck(total: Int): List<AlphabetItem> {
         val all = AlphabetAssets.items
-        val safeTotal = min(total, all.size.coerceAtLeast(1))
+        if (all.isEmpty()) return emptyList()
+        val safeTotal = min(total, all.size)
         return all.shuffled().take(safeTotal)
     }
 
-    private fun createInitialState(): AlphabetGameUiState {
+    private fun createInitialState(keepSoundOn: Boolean): AlphabetGameUiState {
         val totalQuestions = min(10, AlphabetAssets.items.size.coerceAtLeast(1))
         questionDeck = buildDeck(totalQuestions)
 
-        val (q, opts) = generateQuestion(0)
+        // REPARATIE: Folosim argumente numite pentru a evita confuzia de tipuri si ordinea lor
+        val firstItem = if (questionDeck.isNotEmpty()) {
+            questionDeck[0]
+        } else {
+            // Aici era eroarea. Acum specificăm clar fiecare parametru.
+            AlphabetItem(displayLetter = "A", word = "Albină", imageRes = 0)
+        }
+        
+        val (q, opts) = if (questionDeck.isNotEmpty()) generateQuestion(0) else (firstItem to listOf("A", "B", "C"))
+
         return AlphabetGameUiState(
             currentQuestion = q,
             options = opts,
@@ -61,11 +67,16 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
             stars = 0,
             mascotMood = MascotMood.THINKING,
             attemptsLeft = MAX_ATTEMPTS,
-            soundOn = true
+            soundOn = keepSoundOn
         )
     }
 
     private fun generateQuestion(questionIndex: Int): Pair<AlphabetItem, List<String>> {
+        if (questionDeck.isEmpty()) {
+            // REPARATIE: Argumente numite si aici
+            return AlphabetItem(displayLetter = "?", word = "Error", imageRes = 0) to emptyList()
+        }
+        
         val current = questionDeck[questionIndex.coerceIn(questionDeck.indices)]
         val correctBase = AlphabetAssets.normalizeBase(current.displayLetter)
 
@@ -170,6 +181,7 @@ class AlphabetGameViewModel @Inject constructor() : ViewModel() {
     }
 
     fun resetGame() {
-        _uiState.value = createInitialState()
+        val currentSoundSetting = _uiState.value.soundOn
+        _uiState.value = createInitialState(keepSoundOn = currentSoundSetting)
     }
 }
