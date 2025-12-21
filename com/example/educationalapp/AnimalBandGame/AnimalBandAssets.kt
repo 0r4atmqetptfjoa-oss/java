@@ -15,7 +15,9 @@ data class LoadedSheet(
     val sheet: ImageBitmap,
     val spec: SpriteSheetSpec,
     val frameW: Int,
-    val frameH: Int
+    val frameH: Int,
+    /** fracția (0..1) unde se află "picioarele" în frame (pentru aliniere la scenă) */
+    val footYFrac: Float
 )
 
 object AnimalBandAssets {
@@ -27,8 +29,9 @@ object AnimalBandAssets {
         cols = 6,
         idle = FrameRange(start = 0, count = 12),
         play = FrameRange(start = 12, count = 12),
-        idleFramePeriodSec = 0.12f,
-        playFramePeriodSec = 0.08f
+        // mai rapid + mai fluid (fără crossfade): crește "FPS"-ul animației
+        idleFramePeriodSec = 0.10f,
+        playFramePeriodSec = 0.06f
     )
 
     val bearSpec = SpriteSheetSpec(
@@ -36,8 +39,8 @@ object AnimalBandAssets {
         cols = 8,
         idle = FrameRange(start = 0, count = 16),
         play = FrameRange(start = 16, count = 16),
-        idleFramePeriodSec = 0.12f,
-        playFramePeriodSec = 0.08f
+        idleFramePeriodSec = 0.10f,
+        playFramePeriodSec = 0.06f
     )
 
     val catSpec = SpriteSheetSpec(
@@ -45,8 +48,8 @@ object AnimalBandAssets {
         cols = 8,
         idle = FrameRange(start = 0, count = 16),
         play = FrameRange(start = 16, count = 16),
-        idleFramePeriodSec = 0.12f,
-        playFramePeriodSec = 0.08f
+        idleFramePeriodSec = 0.10f,
+        playFramePeriodSec = 0.06f
     )
 
     suspend fun loadAll(context: Context): Map<MusicianId, LoadedSheet> {
@@ -57,11 +60,13 @@ object AnimalBandAssets {
         fun build(bmp: android.graphics.Bitmap, spec: SpriteSheetSpec): LoadedSheet {
             val frameW = (bmp.width / spec.cols).coerceAtLeast(1)
             val frameH = (bmp.height / spec.rows).coerceAtLeast(1)
+            val footYFrac = SpriteSheetUtils.estimateFootYFrac(bmp, spec.rows, spec.cols)
             return LoadedSheet(
                 sheet = bmp.asImageBitmap(),
                 spec = spec,
                 frameW = frameW,
-                frameH = frameH
+                frameH = frameH,
+                footYFrac = footYFrac
             )
         }
 

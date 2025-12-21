@@ -2,6 +2,7 @@ package com.example.educationalapp.AnimalBandGame
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -19,19 +20,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -51,7 +52,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlin.math.PI
-import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -144,12 +144,14 @@ fun AnimalBandGame(
         }
     }
 
-    val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (8f + viewModel.jam * 14f))
+    // bounce global (aplicat doar pe sprite, nu și pe umbră). Am redus amplitudinea ca să nu "plutească".
+    val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (5f + viewModel.jam * 10f))
     val bounceDp = with(density) { bouncePx.toDp() }
 
     Box(
         Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .onSizeChanged { stageSize = it }
     ) {
         Image(
@@ -190,12 +192,14 @@ fun AnimalBandGame(
                 val w = maxWidth
                 val h = maxHeight
 
-                // “linia de picioare” (aprox. suprafața scenei)
-                val floorY = h * 0.71f
+                // "linia de picioare" (aprox. suprafața scenei) – calibrată pentru bg_music_stage.
+                // Padding-ul transparent jos din sprite e compensat prin loaded.footYFrac.
+                val floorY = h * 0.63f
 
-                // Dimensiuni (pe înălțime) – păstrăm aspect ratio al frame-ului!
-                val bearH = (h * 0.34f).coerceIn(200.dp, 360.dp)
-                val sideH = (h * 0.30f).coerceIn(180.dp, 330.dp)
+                // Dimensiuni (pe înălțime) – mai mici decât v4 ca să încapă sub acoperiș.
+                // NOTĂ: clamp-urile nu mai forțează 200dp în landscape.
+                val bearH = (h * 0.40f).coerceIn(150.dp, 300.dp)
+                val sideH = (h * 0.36f).coerceIn(140.dp, 280.dp)
 
                 // FROG (stânga)
                 StageMusician(
@@ -211,7 +215,7 @@ fun AnimalBandGame(
                     beatPhase = beatPhase,
                     jam = viewModel.jam,
                     height = sideH,
-                    xCenter = w * 0.26f,
+                    xCenter = w * 0.30f,
                     feetY = floorY,
                     z = 0.9f,
                     anchorFrac = Offset(0.55f, 0.62f),
@@ -261,7 +265,7 @@ fun AnimalBandGame(
                     beatPhase = beatPhase,
                     jam = viewModel.jam,
                     height = sideH,
-                    xCenter = w * 0.74f,
+                    xCenter = w * 0.70f,
                     feetY = floorY,
                     z = 0.9f,
                     anchorFrac = Offset(0.55f, 0.55f),
@@ -317,9 +321,12 @@ private fun StageMusician(
     val scaleX = baseScale * (1f + lively * pulse)
     val scaleY = baseScale * (1f - lively * pulse)
 
-    // top-left dintr-un punct “center + feet”
+    // top-left dintr-un punct “center + feet”, compensând padding-ul transparent (loaded.footYFrac)
     val x = xCenter - (width / 2f)
-    val y = (feetY - height) + bounce
+    val y = feetY - (height * loaded.footYFrac)
+
+    // bounce mic în idle; bounce mai mare când cântă
+    val localBounce = if (enabled && performing) bounce else (bounce * 0.18f)
 
     val showJudgement = judgement != null &&
         judgementAtNanos > 0L &&
@@ -330,7 +337,6 @@ private fun StageMusician(
             .offset(x = x, y = y)
             .size(width = width, height = height)
             .zIndex(z)
-            .scale(scaleX = scaleX, scaleY = scaleY)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,
@@ -338,50 +344,63 @@ private fun StageMusician(
                 onDoubleClick = onDoubleTap,
                 onLongClick = onLongPress
             )
-            .onGloballyPositioned { coords ->
-                val pos = coords.positionInRoot()
-                val s = coords.size
-                // anchor relativ (instrument / centru interes)
-                onAnchor(Offset(pos.x + s.width * anchorFrac.x, pos.y + s.height * anchorFrac.y))
-            },
-        contentAlignment = Alignment.Center
     ) {
-        // shadow “sub picioare” pentru integrare în fundal
+        // umbră ancorată la "picioare" (nu se mișcă cu bounce / scale)
         Canvas(Modifier.fillMaxSize()) {
-            val shadowW = size.width * 0.55f
-            val shadowH = size.height * 0.10f
+            val shadowW = size.width * 0.52f
+            val shadowH = size.height * 0.08f
             val left = (size.width - shadowW) * 0.5f
-            val top = size.height * 0.88f
+            val baselineY = (size.height * loaded.footYFrac).coerceIn(0f, size.height)
+            val top = (baselineY - shadowH * 0.45f).coerceIn(0f, size.height - shadowH)
             drawOval(
-                color = Color.Black.copy(alpha = if (enabled) 0.18f else 0.10f),
+                color = Color.Black.copy(alpha = if (enabled) 0.20f else 0.10f),
                 topLeft = Offset(left, top),
                 size = androidx.compose.ui.geometry.Size(shadowW, shadowH)
             )
         }
 
-        SpriteSheetActor(
-            sheet = loaded.sheet,
-            spec = spec,
-            frameW = loaded.frameW,
-            frameH = loaded.frameH,
-            enabled = enabled,
-            performing = performing,
-            songTimeNanos = songTimeNanos,
-            modifier = Modifier.fillMaxSize()
-        )
+        // sprite + UI: bounce + scale cu pivot pe "picioare" (nu "plutește")
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .offset(y = localBounce)
+                .graphicsLayer {
+                    val fy = loaded.footYFrac.coerceIn(0f, 1f)
+                    transformOrigin = TransformOrigin(0.5f, fy)
+                    this.scaleX = scaleX
+                    this.scaleY = scaleY
+                }
+                .onGloballyPositioned { coords ->
+                    val pos = coords.positionInRoot()
+                    val s = coords.size
+                    onAnchor(Offset(pos.x + s.width * anchorFrac.x, pos.y + s.height * anchorFrac.y))
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            SpriteSheetActor(
+                sheet = loaded.sheet,
+                spec = spec,
+                frameW = loaded.frameW,
+                frameH = loaded.frameH,
+                enabled = enabled,
+                performing = performing,
+                songTimeNanos = songTimeNanos,
+                modifier = Modifier.fillMaxSize()
+            )
 
-        if (showJudgement) {
-            val txt = when (judgement) {
-                Judgement.PERFECT -> "Perfect"
-                Judgement.GOOD -> "Good"
-                Judgement.MISS -> "Miss"
-                null -> ""
+            if (showJudgement) {
+                val txt = when (judgement) {
+                    Judgement.PERFECT -> "Perfect"
+                    Judgement.GOOD -> "Good"
+                    Judgement.MISS -> "Miss"
+                    null -> ""
+                }
+                BasicText(txt, modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp))
             }
-            BasicText(txt, modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp))
-        }
 
-        if (combo >= 2) {
-            BasicText("x$combo", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+            if (combo >= 2) {
+                BasicText("x$combo", modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+            }
         }
     }
 }
@@ -401,19 +420,13 @@ private fun SpriteSheetActor(
     val framePeriodSec = if (enabled && performing) spec.playFramePeriodSec else spec.idleFramePeriodSec
     val framePeriodNanos = (framePeriodSec * 1_000_000_000f).toLong().coerceAtLeast(1L)
 
-    // poziție fracționară => crossfade între două frame-uri
-    val pos = (songTimeNanos.toDouble() / framePeriodNanos.toDouble())
-    val i0 = floor(pos).toLong()
-    val frac = (pos - i0).toFloat().coerceIn(0f, 1f)
-
-    fun idxFor(i: Long): Int {
-        if (range.count <= 0) return range.start
-        val local = ((i % range.count).toInt()).coerceAtLeast(0)
-        return range.start + local
+    // Fără crossfade (evită "ghosting"/dublare). Fluiditatea vine din framePeriod mai mic.
+    val i = (songTimeNanos / framePeriodNanos).coerceAtLeast(0L)
+    val idx = if (range.count <= 0) {
+        range.start
+    } else {
+        range.start + ((i % range.count).toInt().coerceAtLeast(0))
     }
-
-    val idx0 = idxFor(i0)
-    val idx1 = idxFor(i0 + 1)
 
     Canvas(modifier = modifier) {
         fun drawFrame(index: Int, alpha: Float) {
@@ -434,8 +447,6 @@ private fun SpriteSheetActor(
             }
         }
 
-        // Crossfade: frame0 -> frame1
-        drawFrame(idx0, 1f - frac)
-        drawFrame(idx1, frac)
+        drawFrame(idx, 1f)
     }
 }
