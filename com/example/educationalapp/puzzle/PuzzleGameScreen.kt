@@ -1,6 +1,5 @@
 package com.example.educationalapp.puzzle
 
-import android.graphics.Paint as AndroidPaint
 import android.view.SoundEffectConstants
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,9 +22,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -126,8 +124,10 @@ fun PuzzleGameScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 54.dp, vertical = 18.dp)
                             .aspectRatio(4f / 3f)
+                            .shadow(16.dp, RoundedCornerShape(12.dp), clip = false)
+                            .clip(RoundedCornerShape(12.dp))
                             .background(Color.Black.copy(alpha = 0.18f))
-                            .border(6.dp, Color(0xFF8D6E63), RoundedCornerShape(10.dp))
+                            .border(6.dp, Color(0xFF8D6E63), RoundedCornerShape(12.dp))
                             .onGloballyPositioned { coordinates ->
                                 boardSize = androidx.compose.ui.geometry.Size(
                                     coordinates.size.width.toFloat(),
@@ -139,7 +139,7 @@ fun PuzzleGameScreen(
                             Image(
                                 painter = painterResource(id = uiState.currentThemeResId),
                                 contentDescription = null,
-                                modifier = Modifier.fillMaxSize().alpha(0.25f),
+                                modifier = Modifier.fillMaxSize().alpha(0.42f),
                                 contentScale = ContentScale.FillBounds
                             )
                         }
@@ -147,24 +147,31 @@ fun PuzzleGameScreen(
                         // Ghost targets (premium guide)
                         if (!uiState.isLoading && uiState.pieces.isNotEmpty()) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
-                                val strokePx = with(density) { 2.dp.toPx() }
-                                drawIntoCanvas { canvas ->
-                                    val nc = canvas.nativeCanvas
-                                    val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-                                        style = AndroidPaint.Style.STROKE
-                                        strokeWidth = strokePx
-                                        color = 0x55FFFFFF
-                                    }
+                                val strokePx = 3.dp.toPx()
+                                val strokeColor = Color.White.copy(alpha = 0.75f)
 
-                                    for (piece in uiState.pieces) {
-                                        if (!piece.isLocked) {
-                                            val path = PuzzleShape.createAndroidPath(
-                                                config = piece.config,
-                                                width = piece.width.toFloat(),
-                                                height = piece.height.toFloat()
-                                            )
-                                            path.offset(piece.targetX, piece.targetY)
-                                            nc.drawPath(path, paint)
+                                for (piece in uiState.pieces) {
+                                    if (!piece.isLocked) {
+                                        val shape = PuzzleShape(piece.config)
+                                        val outline = shape.createOutline(
+                                            size = androidx.compose.ui.geometry.Size(
+                                                piece.width.toFloat(),
+                                                piece.height.toFloat()
+                                            ),
+                                            layoutDirection = layoutDirection,
+                                            density = this
+                                        )
+                                        val path = (outline as? androidx.compose.ui.graphics.Outline.Generic)?.path
+                                        if (path != null) {
+                                            withTransform({
+                                                translate(left = piece.targetX, top = piece.targetY)
+                                            }) {
+                                                drawPath(
+                                                    path = path,
+                                                    color = strokeColor,
+                                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx)
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -210,15 +217,19 @@ fun PuzzleGameScreen(
                             .offset { IntOffset(absX.roundToInt(), absY.roundToInt()) }
                             .size(pieceWidthDp, pieceHeightDp)
                             .zIndex(z)
-                            .shadow(elevation = elevation, shape = shape, clip = false)
-                            .clip(shape)
-                            .then(
-                                if (isNear) Modifier.border(2.dp, Color(0xFFFFD54F), shape) else Modifier
-                            )
                             .graphicsLayer {
+                                // Shape-based shadow (nu rectangular)
+                                shadowElevation = with(density) { elevation.toPx() }
+                                shape = shape
+                                clip = true
+                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.80f)
                                 scaleX = scale
                                 scaleY = scale
                             }
+                            .border(2.dp, Color.White.copy(alpha = 0.55f), shape)
+                            .then(
+                                if (isNear) Modifier.border(2.dp, Color(0xFFFFD54F), shape) else Modifier
+                            )
                             .pointerInput(piece.id, piece.isLocked) {
                                 if (!piece.isLocked) {
                                     detectDragGestures(
@@ -249,90 +260,59 @@ fun PuzzleGameScreen(
                             .background(Color.Black.copy(alpha = 0.55f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column(
+                            modifier = Modifier
+                                .widthIn(min = 260.dp, max = 320.dp)
+                                .background(Color.Black.copy(alpha = 0.22f), RoundedCornerShape(18.dp))
+                                .border(2.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+                                .padding(18.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                "PUZZLE COMPLET!",
+                                color = Color.White,
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                             Text(
                                 "BRAVO!",
                                 color = Color.White,
-                                fontSize = 54.sp,
+                                fontSize = 48.sp,
                                 fontWeight = FontWeight.Black
                             )
-                            Spacer(modifier = Modifier.height(18.dp))
+
                             Button(
                                 onClick = {
                                     if (boardSize.width > 0f && boardSize.height > 0f) {
                                         viewModel.startGame(context, boardSize.width, boardSize.height)
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E676))
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C6BC0)),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(
-                                    "Joc Nou",
-                                    fontSize = 22.sp,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                                )
+                                Text("Joc Nou", color = Color.White)
+                            }
+
+                            Button(
+                                onClick = onBack,
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Înapoi", color = Color.White)
                             }
                         }
                     }
-                }
-            }
+                }            }
 
-            // RIGHT: HUD (4x4 only)
-            Column(
+            // RIGHT: tray area (piese la început)
+            Box(
                 modifier = Modifier
                     .weight(0.22f)
                     .fillMaxHeight()
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.18f), RoundedCornerShape(14.dp))
-                    .border(2.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+                    .padding(vertical = 16.dp, end = 16.dp)
+            )
 
-                Text(
-                    "PUZZLE 4x4",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                val remaining = uiState.pieces.count { !it.isLocked }
-                Text(
-                    "Piese rămase: $remaining / 16",
-                    fontSize = 16.sp,
-                    color = Color.White.copy(alpha = 0.92f)
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Button(
-                    onClick = {
-                        if (boardSize.width > 0f && boardSize.height > 0f) {
-                            viewModel.startGame(context, boardSize.width, boardSize.height)
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5C6BC0)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Joc Nou", color = Color.White)
-                }
-
-                Button(
-                    onClick = onBack,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Înapoi", color = Color.White)
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                Text(
-                    "Trage piesele pe tablă.\nSe fixează automat când ești aproape.",
-                    fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.70f)
-                )
-            }
         }
     }
 }

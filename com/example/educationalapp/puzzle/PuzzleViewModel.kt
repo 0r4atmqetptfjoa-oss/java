@@ -254,13 +254,20 @@ class PuzzleViewModel @Inject constructor() : ViewModel() {
         }
 
         // Stroke paint (border)
-        val strokeW = max(2f, min(fullPieceW, fullPieceH) * 0.012f)
+        val strokeW = max(2.5f, min(fullPieceW, fullPieceH) * 0.018f)
         val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeWidth = strokeW
-            color = 0x66FFFFFF
+            color = 0x99FFFFFF
         }
 
+
+        // Subtle darker shadow-stroke to give depth (like real puzzle pieces)
+        val shadowStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = strokeW * 1.05f
+            color = 0x33000000
+        }
         var idCounter = 0
         zCounter = 0
 
@@ -321,6 +328,14 @@ class PuzzleViewModel @Inject constructor() : ViewModel() {
                 val maskPath = PuzzleShape.createAndroidPath(config, fullPieceW.toFloat(), fullPieceH.toFloat())
                 canvas.drawPath(maskPath, maskPaint)
                 maskPaint.xfermode = null
+
+                // Shadow-stroke slightly offset (depth)
+                canvas.save()
+                canvas.translate(strokeW * 0.35f, strokeW * 0.35f)
+                canvas.drawPath(maskPath, shadowStrokePaint)
+                canvas.restore()
+
+                // Bright border
                 canvas.drawPath(maskPath, strokePaint)
                 maskPaint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
 
