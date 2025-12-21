@@ -3,7 +3,6 @@ package com.example.educationalapp
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector2D
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -24,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
@@ -576,13 +574,13 @@ private fun DraggableFoodIcon(
 
     var startPosRoot by remember { mutableStateOf(Offset.Zero) }
     
-    // Corectie: Type inference explicit si accesarea corecta a VectorConverter
+    // Explicit type for Animatable to avoid inference errors
     val offset = remember { 
         Animatable(Offset.Zero, Offset.VectorConverter) 
     }
     val scale = remember { Animatable(1f) }
 
-    // Avem nevoie de un scope extern pentru a lansa animatii independente de gest (ex: release)
+    // External scope for animations that must not block gestures
     val scope = rememberCoroutineScope()
 
     var visible by remember { mutableStateOf(true) }
@@ -616,7 +614,7 @@ private fun DraggableFoodIcon(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     
-                    // Feedback visual la touch (optional, folosind scope extern pentru a nu bloca)
+                    // Launch animation in external scope (non-blocking)
                     scope.launch { scale.animateTo(1.10f, tween(80)) }
 
                     val pointerId = down.id
@@ -630,13 +628,9 @@ private fun DraggableFoodIcon(
                         if (delta != Offset.Zero) {
                             change.consume()
                             
-                            // Corectie: snapTo este suspend function, dar e rapid. 
-                            // Îl apelăm direct în buclă (awaitEachGesture este un suspend block).
-                            // try-catch pentru safety dacă animația e anulată
-                            try {
+                            // Use scope.launch to call suspend function snapTo from restricted scope
+                            scope.launch {
                                 offset.snapTo(offset.value + delta)
-                            } catch (e: Exception) {
-                                // ignore
                             }
 
                             if (startPosRoot != Offset.Zero && mouthPosition != Offset.Zero) {
@@ -649,7 +643,7 @@ private fun DraggableFoodIcon(
                         }
                     }
 
-                    // Release logic (verificăm unde am dat drumul)
+                    // Release logic
                     scope.launch {
                         scale.animateTo(1f, tween(90))
                         
@@ -670,18 +664,16 @@ private fun DraggableFoodIcon(
                                     x = (mouthPosition.x - startPosRoot.x - halfPx),
                                     y = (mouthPosition.y - startPosRoot.y - halfPx)
                                 )
-                                // Suck into mouth
+                                // Animation sequence on external scope
                                 offset.animateTo(targetOffset, tween(140))
                                 scale.animateTo(0.10f, tween(140))
                                 
-                                // Reset
                                 offset.snapTo(Offset.Zero)
                                 scale.snapTo(1f)
                                 visible = false
                                 delay(650)
                                 visible = true
                             } else {
-                                // Snap back home
                                 offset.animateTo(Offset.Zero, tween(220))
                             }
                         }
