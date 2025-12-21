@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -206,14 +207,12 @@ fun MusicianView(
     var frameIndex by remember { mutableIntStateOf(0) }
     val scale = remember { Animatable(1f) }
 
-    // --- FIX ANIMATION SPEED ---
     LaunchedEffect(playing) {
         var acc = 0f
         while (isActive) {
             val dt = 0.016f 
             withFrameNanos { } 
             acc += dt
-            // 0.12f = approx 8 FPS (miscare mai lenta, stil cartoon)
             if (acc >= 0.12f) { 
                 acc = 0f
                 if (playing) {
@@ -245,7 +244,6 @@ fun MusicianView(
             .onGloballyPositioned { coordinates ->
                 val pos = coordinates.positionInRoot()
                 val size = coordinates.size
-                // Calculam ancora aproximativ la "gura" sau centrul instrumentului
                 onAnchor(Offset(pos.x + size.width * 0.7f, pos.y + size.height * 0.4f))
             },
         contentAlignment = Alignment.Center
@@ -275,7 +273,6 @@ fun BandHud(modifier: Modifier, phase: Float, jam: Float, finalJam: Boolean) {
     }
 }
 
-// Helpers
 fun splitSpriteSheet(sheet: Bitmap?, rows: Int, cols: Int): List<Bitmap> {
     if (sheet == null || rows <= 0 || cols <= 0) return emptyList()
     val w = sheet.width / cols
@@ -291,7 +288,6 @@ fun splitSpriteSheet(sheet: Bitmap?, rows: Int, cols: Int): List<Bitmap> {
     return list
 }
 
-// VFX Utils
 object BandVfxUtils {
     fun spawnNoteBurst(list: MutableList<BandParticle>, pos: Offset, jam: Float) {
         if (pos == Offset.Zero) return
@@ -299,6 +295,7 @@ object BandVfxUtils {
     }
 }
 
+// --- CLASA CORECTATĂ ---
 class BandParticle(var x: Float, var y: Float) { 
     var alive = true
     var age = 0f
@@ -315,10 +312,13 @@ class BandParticle(var x: Float, var y: Float) {
     
     fun draw(scope: androidx.compose.ui.graphics.drawscope.DrawScope, img: ImageBitmap?) {
         val alpha = (1f - age / 1.5f).coerceIn(0f, 1f)
+        val s = 1f - age * 0.3f
+        
         if(img != null) {
             scope.withTransform({
                 translate(x, y)
-                scale(1f - age*0.3f)
+                // --- FIX: Specificam scaleX si scaleY explicit ---
+                scale(scaleX = s, scaleY = s)
             }) {
                 drawImage(img, Offset(-img.width/2f, -img.height/2f), alpha = alpha)
             }

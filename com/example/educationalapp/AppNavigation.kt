@@ -17,13 +17,13 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.flow.distinctUntilChanged
 
-// --- IMPORTS PENTRU JOCURILE REFACTORIZATE ---
+// --- JOCURI REFACTORIZATE ---
 import com.example.educationalapp.puzzle.PuzzleGameScreen
 import com.example.educationalapp.AnimalBandGame.AnimalBandGame
 import com.example.educationalapp.EggGame.EggGameScreen
 import com.example.educationalapp.FeedGame.FeedGameScreen
 
-// --- ALTE IMPORTS (Verifica sa existe) ---
+// --- JOCURI SI ECRANE DIN PACHETE SPECIFICE ---
 import com.example.educationalapp.alphabet.AlphabetGameScreen
 import com.example.educationalapp.alphabet.AlphabetMenuScreen
 import com.example.educationalapp.colors.ColorsGameScreen
@@ -45,17 +45,9 @@ import com.example.educationalapp.features.sounds.SoundsMenuScreen
 import com.example.educationalapp.features.sounds.WildSoundsScreen
 import com.example.educationalapp.features.stories.StoriesMenuScreen
 import com.example.educationalapp.peekaboo.PeekABooGame
-import com.example.educationalapp.features.games.MemoryGameScreen
-import com.example.educationalapp.features.games.HiddenObjectsGameScreen
-import com.example.educationalapp.features.games.SortingGameScreen
-import com.example.educationalapp.features.games.MathGameScreen
-import com.example.educationalapp.features.games.MazeGameScreen
-import com.example.educationalapp.features.games.BlocksGameScreen
-import com.example.educationalapp.features.games.CookingGameScreen
-import com.example.educationalapp.features.games.ShadowMatchGameScreen
-import com.example.educationalapp.features.games.AnimalSortingGameScreen
-import com.example.educationalapp.features.games.EmotionsGameScreen
-import com.example.educationalapp.features.games.InstrumentsGameScreen
+
+// --- NOTA: Ecranele de mai jos sunt in acelasi pachet sau in root, deci nu necesita import special
+// MemoryGameScreen, HiddenObjectsGameScreen, etc.
 
 @Composable
 fun AppNavigation(viewModel: MainViewModel) {
@@ -124,19 +116,71 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.PEEKABOO) { PeekABooGame(onHome = { navController.popBackStack() }) }
         composable(GameRoutes.COLORS) { ColorsGameScreen(onBack = { navController.popBackStack() }) }
         composable(GameRoutes.SHAPES) { ShapesGameScreen(onBack = { navController.popBackStack() }) }
-        composable(GameRoutes.CODING) { val game = gameByRoute.getValue(GameRoutes.CODING); GameContainer(game) { CodingGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.SEQUENCE) { val game = gameByRoute.getValue(GameRoutes.SEQUENCE); GameContainer(game) { SequenceMemoryGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.MEMORY) { val game = gameByRoute.getValue(GameRoutes.MEMORY); GameContainer(game) { MemoryGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.HIDDEN_OBJECTS) { val game = gameByRoute.getValue(GameRoutes.HIDDEN_OBJECTS); GameContainer(game) { HiddenObjectsGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.SORTING) { val game = gameByRoute.getValue(GameRoutes.SORTING); GameContainer(game) { SortingGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.MATH) { val game = gameByRoute.getValue(GameRoutes.MATH); GameContainer(game) { MathGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.MAZE) { val game = gameByRoute.getValue(GameRoutes.MAZE); GameContainer(game) { MazeGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.BLOCKS) { val game = gameByRoute.getValue(GameRoutes.BLOCKS); GameContainer(game) { BlocksGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.COOKING) { val game = gameByRoute.getValue(GameRoutes.COOKING); GameContainer(game) { CookingGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.SHADOW_MATCH) { val game = gameByRoute.getValue(GameRoutes.SHADOW_MATCH); GameContainer(game) { ShadowMatchGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.ANIMAL_SORTING) { val game = gameByRoute.getValue(GameRoutes.ANIMAL_SORTING); GameContainer(game) { AnimalSortingGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.EMOTIONS) { val game = gameByRoute.getValue(GameRoutes.EMOTIONS); GameContainer(game) { EmotionsGameScreen(navController = navController, starState = starState) } }
-        composable(GameRoutes.INSTRUMENTS) { val game = gameByRoute.getValue(GameRoutes.INSTRUMENTS); GameContainer(game) { InstrumentsGameScreen(navController = navController, starState = starState) } }
+        
+        composable(GameRoutes.CODING) { 
+            val game = gameByRoute.getValue(GameRoutes.CODING)
+            GameContainer(game) { CodingGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.SEQUENCE) { 
+            val game = gameByRoute.getValue(GameRoutes.SEQUENCE)
+            GameContainer(game) { SequenceMemoryGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.MEMORY) { 
+            val game = gameByRoute.getValue(GameRoutes.MEMORY)
+            GameContainer(game) { MemoryGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.HIDDEN_OBJECTS) { 
+            val game = gameByRoute.getValue(GameRoutes.HIDDEN_OBJECTS)
+            GameContainer(game) { HiddenObjectsGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.SORTING) { 
+            val game = gameByRoute.getValue(GameRoutes.SORTING)
+            GameContainer(game) { SortingGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.MATH) { 
+            val game = gameByRoute.getValue(GameRoutes.MATH)
+            GameContainer(game) { MathGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.MAZE) { 
+            val game = gameByRoute.getValue(GameRoutes.MAZE)
+            GameContainer(game) { MazeGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.BLOCKS) { 
+            val game = gameByRoute.getValue(GameRoutes.BLOCKS)
+            GameContainer(game) { BlocksGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.COOKING) { 
+            val game = gameByRoute.getValue(GameRoutes.COOKING)
+            GameContainer(game) { CookingGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.SHADOW_MATCH) { 
+            val game = gameByRoute.getValue(GameRoutes.SHADOW_MATCH)
+            GameContainer(game) { ShadowMatchGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.ANIMAL_SORTING) { 
+            val game = gameByRoute.getValue(GameRoutes.ANIMAL_SORTING)
+            GameContainer(game) { AnimalSortingGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.EMOTIONS) { 
+            val game = gameByRoute.getValue(GameRoutes.EMOTIONS)
+            GameContainer(game) { EmotionsGameScreen(navController = navController, starState = starState) } 
+        }
+        
+        composable(GameRoutes.INSTRUMENTS) { 
+            val game = gameByRoute.getValue(GameRoutes.INSTRUMENTS)
+            GameContainer(game) { InstrumentsGameScreen(navController = navController, starState = starState) } 
+        }
 
         // ALPHABET
         navigation(startDestination = GameRoutes.ALPHABET_MENU, route = GameRoutes.ALPHABET_GRAPH) {
