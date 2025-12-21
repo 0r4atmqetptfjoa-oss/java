@@ -6,13 +6,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
+
+// Importurile modulelor
 import com.example.educationalapp.alphabet.AlphabetGameScreen
 import com.example.educationalapp.alphabet.AlphabetMenuScreen
 import com.example.educationalapp.colors.ColorsGameScreen
-import com.example.educationalapp.features.games.*
+import com.example.educationalapp.features.games.* // Aici e GameRoutes
 import com.example.educationalapp.features.instruments.InstrumentsMenuScreen
 import com.example.educationalapp.features.mainmenu.MainMenuScreen
-import com.example.educationalapp.features.settings.SettingsScreen
+// SettingsScreen este în același pachet (com.example.educationalapp), deci nu are nevoie de import special
+// import com.example.educationalapp.features.settings.SettingsScreen <-- ACESTA ERA GREȘIT
+
 import com.example.educationalapp.features.songs.SongsMenuScreen
 import com.example.educationalapp.features.songs.SongPlayerScreen
 import com.example.educationalapp.features.sounds.*
@@ -21,13 +25,12 @@ import com.example.educationalapp.peekaboo.PeekABooGame
 import com.example.educationalapp.puzzle.PuzzleGameScreen
 import com.example.educationalapp.shapes.ShapesGameScreen
 
-// IMPORTURI NOI:
+// JOCURI NOI - IMPORTURI CORECTATE
 import com.example.educationalapp.BalloonGame.BalloonGameScreen
 import com.example.educationalapp.MemoryGame.MemoryGameScreen
-// (Opțional: Egg, Feed, AnimalBand imports dacă nu sunt deja importate prin * )
 import com.example.educationalapp.AnimalBandGame.AnimalBandGame
-// import com.example.educationalapp.EggGame.EggGameScreen // asigură-te că există
-// import com.example.educationalapp.FeedGame.FeedGameScreen // asigură-te că există
+import com.example.educationalapp.EggGame.EggGameScreen      // <-- DECOMENTAT
+import com.example.educationalapp.FeedGame.FeedGameScreen    // <-- DECOMENTAT
 
 /**
  * Helper: încearcă să se întoarcă la GamesMenu dacă există în backstack,
@@ -154,7 +157,8 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.SEQUENCE) { wrap(GameRoutes.SEQUENCE) { SequenceMemoryGameScreen(navController, starState) }() }
         composable(GameRoutes.MATH) { wrap(GameRoutes.MATH) { MathGameScreen(navController, starState) }() }
 
-        // Placeholder pt jocurile Egg/Feed dacă nu sunt implementate complet, altfel lasă-le așa:
+        // --- AICI ERAU ERORILE DE "UNRESOLVED REFERENCE" ---
+        // Acum sunt rezolvate prin importurile de sus
         composable(GameRoutes.EGG_SURPRISE) { wrap(GameRoutes.EGG_SURPRISE) { EggGameScreen(onHome = { backToGames(navController) }) }() }
         composable(GameRoutes.FEED_MONSTER) { wrap(GameRoutes.FEED_MONSTER) { FeedGameScreen(onHome = { backToGames(navController) }) }() }
 
