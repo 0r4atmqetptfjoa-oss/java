@@ -1,6 +1,5 @@
 package com.example.educationalapp.puzzle
 
-import android.graphics.Path as AndroidPath
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -35,10 +34,10 @@ class PuzzleShape(private val config: PieceConfig) : Shape {
         
         val baseWidth = size.width * (3f / 5f)
         val baseHeight = size.height * (3f / 5f)
-
+        
         val offsetX = size.width * (1f / 5f) // Padding stânga
         val offsetY = size.height * (1f / 5f) // Padding sus
-
+        
         val bumpSize = baseWidth / 3.5f // Mărimea urechiușei
 
         // Pornim desenarea de la colțul "corpului" (după padding-ul transparent)
@@ -100,94 +99,5 @@ class PuzzleShape(private val config: PieceConfig) : Shape {
             startX, startY + length - portion
         )
         path.lineTo(startX, startY + length)
-    }
-
-    companion object {
-        /**
-         * Android Path generator pentru a aplica mască direct în Bitmap (anti-aliased),
-         * folosind aceeași matematică ca Shape-ul Compose.
-         */
-        fun createAndroidPath(config: PieceConfig, width: Float, height: Float): AndroidPath {
-            val path = AndroidPath()
-
-            val baseWidth = width * (3f / 5f)
-            val baseHeight = height * (3f / 5f)
-            val offsetX = width * (1f / 5f)
-            val offsetY = height * (1f / 5f)
-            val bumpSize = baseWidth / 3.5f
-
-            path.moveTo(offsetX, offsetY)
-
-            // --- SUS ---
-            if (config.top == 0) {
-                path.lineTo(offsetX + baseWidth, offsetY)
-            } else {
-                val dir = if (config.top == 1) -1f else 1f
-                drawHorizontalBumpAndroid(path, offsetX, offsetY, baseWidth, bumpSize, dir)
-            }
-
-            // --- DREAPTA ---
-            if (config.right == 0) {
-                path.lineTo(offsetX + baseWidth, offsetY + baseHeight)
-            } else {
-                val dir = if (config.right == 1) 1f else -1f
-                drawVerticalBumpAndroid(path, offsetX + baseWidth, offsetY, baseHeight, bumpSize, dir)
-            }
-
-            // --- JOS ---
-            if (config.bottom == 0) {
-                path.lineTo(offsetX, offsetY + baseHeight)
-            } else {
-                val dir = if (config.bottom == 1) 1f else -1f
-                drawHorizontalBumpAndroid(path, offsetX + baseWidth, offsetY + baseHeight, -baseWidth, bumpSize, dir)
-            }
-
-            // --- STÂNGA ---
-            if (config.left == 0) {
-                path.lineTo(offsetX, offsetY)
-            } else {
-                val dir = if (config.left == 1) -1f else 1f
-                drawVerticalBumpAndroid(path, offsetX, offsetY + baseHeight, -baseHeight, bumpSize, dir)
-            }
-
-            path.close()
-            return path
-        }
-
-        private fun drawHorizontalBumpAndroid(
-            path: AndroidPath,
-            startX: Float,
-            startY: Float,
-            length: Float,
-            size: Float,
-            dir: Float
-        ) {
-            val portion = length / 3f
-            path.lineTo(startX + portion, startY)
-            path.cubicTo(
-                startX + portion, startY + size * dir,
-                startX + length - portion, startY + size * dir,
-                startX + length - portion, startY
-            )
-            path.lineTo(startX + length, startY)
-        }
-
-        private fun drawVerticalBumpAndroid(
-            path: AndroidPath,
-            startX: Float,
-            startY: Float,
-            length: Float,
-            size: Float,
-            dir: Float
-        ) {
-            val portion = length / 3f
-            path.lineTo(startX, startY + portion)
-            path.cubicTo(
-                startX + size * dir, startY + portion,
-                startX + size * dir, startY + length - portion,
-                startX, startY + length - portion
-            )
-            path.lineTo(startX, startY + length)
-        }
     }
 }
