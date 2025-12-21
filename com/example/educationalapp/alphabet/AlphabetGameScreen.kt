@@ -167,7 +167,8 @@ fun AlphabetGameScreen(
                         soundPlayer.isEnabled = newSoundOn
                         viewModel.toggleSound()
                         if (newSoundOn) soundPlayer.playClick()
-                    }
+                    },
+                    onHome = { soundPlayer.playClick(); onBackToMenu() }
                 )
 
                 
@@ -178,59 +179,73 @@ fun AlphabetGameScreen(
                     modifier = Modifier.fillMaxSize()
                 ) {
                     val isLandscape = maxWidth > maxHeight
-                    val gap = if (isLandscape) 8.dp else 12.dp
+                    val gap = if (isLandscape) 10.dp else 12.dp
 
-                    // Dimensiuni responsive pentru cartonaș (îl limităm ca să nu înghită tot ecranul pe landscape).
-            val cardWidth = (maxWidth * if (isLandscape) 0.62f else 0.72f)
-                        .coerceIn(240.dp, 390.dp)
-            val cardHeight = (maxHeight * if (isLandscape) 0.62f else 0.48f)
-                        .coerceIn(160.dp, 260.dp)
+                    // Card mai mare + imagine mai mare (cerință user)
+                    val cardWidth = (maxWidth * if (isLandscape) 0.60f else 0.72f)
+                        .coerceIn(300.dp, if (isLandscape) 760.dp else 420.dp)
+                    val cardHeight = (maxHeight * if (isLandscape) 0.72f else 0.48f)
+                        .coerceIn(200.dp, if (isLandscape) 440.dp else 280.dp)
 
-                    val mascotSize = if (isLandscape) 105.dp else 135.dp
-            val optionSize = if (isLandscape) 82.dp else 94.dp
+                    val mascotSize = if (isLandscape) 150.dp else 135.dp
+                    val optionSize = if (isLandscape) 100.dp else 94.dp
 
-                    // Rezervăm spațiu în dreapta jos, ca să nu se suprapună butonul Home peste conținut.
-                    val rightSafePadding = 84.dp
+                    if (isLandscape) {
+                        val isCorrect = uiState.isAnswerCorrect == true
+                        val isWrong = uiState.isAnswerCorrect == false
 
-                    Column(modifier = Modifier.fillMaxSize()) {
+                        val borderColor by animateColorAsState(
+                            targetValue = when {
+                                isCorrect -> Color(0xFF43A047)
+                                isWrong -> Color(0xFFE53935)
+                                else -> Color(0xFFFF9800)
+                            },
+                            label = "cardBorder"
+                        )
+
+                        val cardScale by animateFloatAsState(
+                            targetValue = when {
+                                isCorrect -> 1.03f
+                                isWrong -> 0.99f
+                                else -> 1.0f
+                            },
+                            label = "cardScale"
+                        )
+
+                        val word = remember(uiState.currentQuestion.word) {
+                            val w = uiState.currentQuestion.word
+                            if (w.isNotEmpty()) "_" + w.drop(1) else "_"
+                        }
+
+                        val mascotRes = when (uiState.mascotMood) {
+                            MascotMood.HAPPY, MascotMood.CELEBRATE -> AlphabetUi.Mascot.happy
+                            MascotMood.SURPRISED -> AlphabetUi.Mascot.surprised
+                            MascotMood.THINKING -> AlphabetUi.Mascot.thinking
+                            else -> AlphabetUi.Mascot.normal
+                        }
 
                         // =============================================================
-                        // MIJLOC (CARTONAȘ + NUME)
+                        // LANDSCAPE: regiuni clare (ca în schema ta):
+                        // - SUS (header): stele + progres/întrebare + șanse + sound + home
+                        // - STÂNGA: card animal/obiect
+                        // - DREAPTA SUS: cuvânt cu literă lipsă
+                        // - DREAPTA JOS: butoane litere + mascota în dreapta
                         // =============================================================
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .padding(horizontal = 6.dp),
+                                .fillMaxSize()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
 
-                            // --- ZONA CARTONAȘULUI (Stânga) ---
+                            // --- CARD (galben) ---
                             Box(
                                 modifier = Modifier
-                                    .weight(0.6f)
+                                    .weight(0.62f)
                                     .fillMaxHeight(),
                                 contentAlignment = Alignment.Center
                             ) {
-
-                                val isCorrect = uiState.isAnswerCorrect == true
-                                val isWrong = uiState.isAnswerCorrect == false
-
-                                val borderColor by animateColorAsState(
-                                    targetValue = when {
-                                        isCorrect -> Color(0xFF43A047)
-                                        isWrong -> Color(0xFFE53935)
-                                        else -> Color(0xFFFFB74D)
-                                    },
-                                    label = "cardBorder"
-                                )
-
-                                val cardScale by animateFloatAsState(
-                                    targetValue = if (isCorrect) 1.03f else 1f,
-                                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-                                    label = "cardScale"
-                                )
-
                                 Box(
                                     modifier = Modifier
                                         .width(cardWidth)
@@ -243,186 +258,364 @@ fun AlphabetGameScreen(
                                         .padding(7.dp)
                                 ) {
                                     val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 900)
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(
-                                                Brush.verticalGradient(
-                                                    listOf(
-                                                        Color(0xFFE3F2FD),
-                                                        Color(0xFFF1F8E9)
-                                                    )
-                                                )
-                                            ),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (centerBmp != null) {
-                                            Image(
-                                                bitmap = centerBmp,
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(0.92f),
-                                                contentScale = ContentScale.Fit
-                                            )
-                                        } else {
-                                            Image(
-                                                painter = painterResource(id = uiState.currentQuestion.imageRes),
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(0.92f),
-                                                contentScale = ContentScale.Fit
-                                            )
-                                        }
+                                    if (centerBmp != null) {
+                                        Image(
+                                            bitmap = centerBmp,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(0.96f),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        Image(
+                                            painter = painterResource(id = uiState.currentQuestion.imageRes),
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(0.96f),
+                                            contentScale = ContentScale.Fit
+                                        )
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(if (isLandscape) 10.dp else 14.dp))
-
-                            // --- ZONA NUMELUI (Dreapta) ---
-                            Box(
+                            // --- DREAPTA (verde + maro + negru) ---
+                            Column(
                                 modifier = Modifier
-                                    .weight(0.4f)
+                                    .weight(0.38f)
                                     .fillMaxHeight(),
-                                contentAlignment = Alignment.CenterStart
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                val formattedWord = if (uiState.isAnswerCorrect == true) {
-                                    uiState.currentQuestion.word.replaceFirstChar { it.uppercaseChar() }
-                                } else {
-                                    "_" + uiState.currentQuestion.word.drop(1)
+
+                                // (verde) cuvântul
+                                Surface(
+                                    shape = RoundedCornerShape(18.dp),
+                                    color = Color(0xFFFFF3E0).copy(alpha = 0.95f),
+                                    shadowElevation = 6.dp
+                                ) {
+                                    Text(
+                                        text = word,
+                                        fontSize = 38.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFFE65100),
+                                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                                        letterSpacing = 1.sp,
+                                        maxLines = 1
+                                    )
                                 }
 
-                                AnimatedContent(targetState = formattedWord, label = "word") { word ->
-                                    Surface(
-                                        color = Color(0xFFFFF3E0),
-                                        shape = RoundedCornerShape(16.dp),
-                                        shadowElevation = 6.dp,
-                                        modifier = Modifier.padding(end = 8.dp)
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                if (uiState.isFinished) {
+                                    // La final, panoul de finish ocupă zona de jos (în loc de butoane).
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.BottomCenter
                                     ) {
-                                        Text(
-                                            text = word,
-                                            fontSize = if (isLandscape) 32.sp else 36.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color(0xFFE65100),
-                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                                            letterSpacing = 1.sp
+                                        FinishPanel(
+                                            score = uiState.score,
+                                            stars = uiState.stars,
+                                            total = uiState.totalQuestions,
+                                            onRestart = { soundPlayer.playClick(); viewModel.resetGame() },
+                                            onBackToMenu = { soundPlayer.playClick(); onBackToMenu() }
+                                        )
+                                    }
+                                } else {
+                                    // (maro) butoanele + (negru) mascota
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 6.dp),
+                                        verticalAlignment = Alignment.Bottom
+                                    ) {
+                                        Box(
+                                            modifier = Modifier.weight(1f),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                uiState.options.forEach { option ->
+                                                    val isSelectedCorrect =
+                                                        uiState.isAnswerCorrect == true &&
+                                                            AlphabetAssets.normalizeBase(option) ==
+                                                            AlphabetAssets.normalizeBase(uiState.currentQuestion.displayLetter)
+                                                    val isSelectedWrong =
+                                                        uiState.isAnswerCorrect == false && uiState.selectedOption == option
+
+                                                    val containerColor = when {
+                                                        isSelectedCorrect -> Color(0xFF4CAF50)
+                                                        isSelectedWrong -> Color(0xFFEF5350)
+                                                        else -> Color(0xFFFF9800)
+                                                    }
+
+                                                    SquishyButton(
+                                                        onClick = {
+                                                            if (!uiState.isInputLocked) {
+                                                                soundPlayer.playClick()
+                                                                viewModel.selectAnswer(option)
+                                                            }
+                                                        },
+                                                        size = optionSize,
+                                                        shape = CircleShape,
+                                                        color = containerColor,
+                                                        elevation = 10.dp
+                                                    ) {
+                                                        Text(
+                                                            text = option,
+                                                            fontSize = 44.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            color = Color.White
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(12.dp))
+
+                                        Image(
+                                            painter = painterResource(id = mascotRes),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(mascotSize),
+                                            contentScale = ContentScale.Fit
                                         )
                                     }
                                 }
                             }
                         }
+                    } else {
 
-                        Spacer(modifier = Modifier.height(gap))
+                        Column(modifier = Modifier.fillMaxSize()) {
 
-                        // =============================================================
-                        // JOS (MASCOTA & BUTOANE / REZULTAT) - fără suprapuneri
-                        // =============================================================
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(
-                                    start = 12.dp,
-                                    end = rightSafePadding,
-                                    bottom = if (isLandscape) 10.dp else 14.dp
-                                ),
-                            verticalAlignment = Alignment.Bottom,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
+                                                // =============================================================
+                                                // MIJLOC (CARTONAȘ + NUME)
+                                                // =============================================================
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .weight(1f)
+                                                        .padding(horizontal = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
 
-                            val mascotRes = when (uiState.mascotMood) {
-                                MascotMood.HAPPY, MascotMood.CELEBRATE -> AlphabetUi.Mascot.happy
-                                MascotMood.SURPRISED -> AlphabetUi.Mascot.surprised
-                                MascotMood.THINKING -> AlphabetUi.Mascot.thinking
-                                else -> AlphabetUi.Mascot.normal
-                            }
+                                                    // --- ZONA CARTONAȘULUI (Stânga) ---
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(0.6f)
+                                                            .fillMaxHeight(),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
 
-                            Image(
-                                painter = painterResource(id = mascotRes),
-                                contentDescription = "Mascot",
-                                modifier = Modifier.size(mascotSize),
-                                contentScale = ContentScale.Fit,
-                                alignment = Alignment.BottomStart
-                            )
+                                                        val isCorrect = uiState.isAnswerCorrect == true
+                                                        val isWrong = uiState.isAnswerCorrect == false
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f),
-                                contentAlignment = Alignment.BottomCenter
-                            ) {
-                                if (uiState.isFinished) {
-                                    FinishPanel(
-                                        score = uiState.score,
-                                        stars = uiState.stars,
-                                        total = uiState.totalQuestions,
-                                        onReplay = {
-                                            soundPlayer.playClick()
-                                            viewModel.resetGame()
-                                        }
-                                    )
-                                } else {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 16.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        uiState.options.forEach { option ->
-                                            val isSelectedCorrect =
-                                                uiState.isAnswerCorrect == true &&
-                                                    AlphabetAssets.normalizeBase(option) ==
-                                                    AlphabetAssets.normalizeBase(uiState.currentQuestion.displayLetter)
-                                            val isSelectedWrong =
-                                                uiState.isAnswerCorrect == false && uiState.selectedOption == option
+                                                        val borderColor by animateColorAsState(
+                                                            targetValue = when {
+                                                                isCorrect -> Color(0xFF43A047)
+                                                                isWrong -> Color(0xFFE53935)
+                                                                else -> Color(0xFFFFB74D)
+                                                            },
+                                                            label = "cardBorder"
+                                                        )
 
-                                            val containerColor = when {
-                                                isSelectedCorrect -> Color(0xFF4CAF50)
-                                                isSelectedWrong -> Color(0xFFEF5350)
-                                                else -> Color(0xFFFF9800)
-                                            }
+                                                        val cardScale by animateFloatAsState(
+                                                            targetValue = if (isCorrect) 1.03f else 1f,
+                                                            animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                                                            label = "cardScale"
+                                                        )
 
-                                            SquishyButton(
-                                                onClick = {
-                                                    if (!uiState.isInputLocked) {
-                                                        soundPlayer.playClick()
-                                                        viewModel.selectAnswer(option)
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .width(cardWidth)
+                                                                .height(cardHeight)
+                                                                .scale(cardScale)
+                                                                .graphicsLayer { translationX = shakeX.value }
+                                                                .shadow(12.dp, RoundedCornerShape(22.dp))
+                                                                .background(Color.White, RoundedCornerShape(22.dp))
+                                                                .border(BorderStroke(4.dp, borderColor), RoundedCornerShape(22.dp))
+                                                                .padding(7.dp)
+                                                        ) {
+                                                            val centerBmp = rememberScaledImageBitmap(uiState.currentQuestion.imageRes, maxDim = 900)
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxSize()
+                                                                    .clip(RoundedCornerShape(16.dp))
+                                                                    .background(
+                                                                        Brush.verticalGradient(
+                                                                            listOf(
+                                                                                Color(0xFFE3F2FD),
+                                                                                Color(0xFFF1F8E9)
+                                                                            )
+                                                                        )
+                                                                    ),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                if (centerBmp != null) {
+                                                                    Image(
+                                                                        bitmap = centerBmp,
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.fillMaxSize(0.92f),
+                                                                        contentScale = ContentScale.Fit
+                                                                    )
+                                                                } else {
+                                                                    Image(
+                                                                        painter = painterResource(id = uiState.currentQuestion.imageRes),
+                                                                        contentDescription = null,
+                                                                        modifier = Modifier.fillMaxSize(0.92f),
+                                                                        contentScale = ContentScale.Fit
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
                                                     }
-                                                },
-                                                size = optionSize,
-                                                shape = CircleShape,
-                                                color = containerColor,
-                                                elevation = 10.dp
-                                            ) {
-                                                Text(
-                                                    text = option,
-                                                    fontSize = if (isLandscape) 40.sp else 44.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color.White
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
 
-                    // BUTON HOME peste UI (nu ocupă spațiu)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.BottomEnd
-                    ) {
-                        SquishyButton(
-                            onClick = { soundPlayer.playClick(); onBackToMenu() },
-                            size = 50.dp,
-                            shape = CircleShape
-                        ) {
-                            Image(
-                                painter = painterResource(id = AlphabetUi.Icons.home),
-                                contentDescription = "Home",
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
+                                                    Spacer(modifier = Modifier.width(if (isLandscape) 10.dp else 14.dp))
+
+                                                    // --- ZONA NUMELUI (Dreapta) ---
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(0.4f)
+                                                            .fillMaxHeight(),
+                                                        contentAlignment = Alignment.CenterStart
+                                                    ) {
+                                                        val formattedWord = if (uiState.isAnswerCorrect == true) {
+                                                            uiState.currentQuestion.word.replaceFirstChar { it.uppercaseChar() }
+                                                        } else {
+                                                            "_" + uiState.currentQuestion.word.drop(1)
+                                                        }
+
+                                                        AnimatedContent(targetState = formattedWord, label = "word") { word ->
+                                                            Surface(
+                                                                color = Color(0xFFFFF3E0),
+                                                                shape = RoundedCornerShape(16.dp),
+                                                                shadowElevation = 6.dp,
+                                                                modifier = Modifier.padding(end = 8.dp)
+                                                            ) {
+                                                                Text(
+                                                                    text = word,
+                                                                    fontSize = if (isLandscape) 32.sp else 36.sp,
+                                                                    fontWeight = FontWeight.Black,
+                                                                    color = Color(0xFFE65100),
+                                                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                                                    letterSpacing = 1.sp
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(gap))
+
+                                                // =============================================================
+                                                // JOS (MASCOTA & BUTOANE / REZULTAT) - fără suprapuneri
+                                                // =============================================================
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(
+                                                            start = 12.dp,
+                                                            end = 12.dp,
+                                                            bottom = if (isLandscape) 10.dp else 14.dp
+                                                        ),
+                                                    verticalAlignment = Alignment.Bottom,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+
+                                                    val mascotRes = when (uiState.mascotMood) {
+                                                        MascotMood.HAPPY, MascotMood.CELEBRATE -> AlphabetUi.Mascot.happy
+                                                        MascotMood.SURPRISED -> AlphabetUi.Mascot.surprised
+                                                        MascotMood.THINKING -> AlphabetUi.Mascot.thinking
+                                                        else -> AlphabetUi.Mascot.normal
+                                                    }
+
+                                                    Image(
+                                                        painter = painterResource(id = mascotRes),
+                                                        contentDescription = "Mascot",
+                                                        modifier = Modifier.size(mascotSize),
+                                                        contentScale = ContentScale.Fit,
+                                                        alignment = Alignment.BottomStart
+                                                    )
+
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .weight(1f),
+                                                        contentAlignment = Alignment.BottomCenter
+                                                    ) {
+                                                        if (uiState.isFinished) {
+                                                            FinishPanel(
+                                                                score = uiState.score,
+                                                                stars = uiState.stars,
+                                                                total = uiState.totalQuestions,
+                                                                onReplay = {
+                                                                    soundPlayer.playClick()
+                                                                    viewModel.resetGame()
+                                                                }
+                                                            )
+                                                        } else {
+                                                            Row(
+                                                                horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 10.dp else 16.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                uiState.options.forEach { option ->
+                                                                    val isSelectedCorrect =
+                                                                        uiState.isAnswerCorrect == true &&
+                                                                            AlphabetAssets.normalizeBase(option) ==
+                                                                            AlphabetAssets.normalizeBase(uiState.currentQuestion.displayLetter)
+                                                                    val isSelectedWrong =
+                                                                        uiState.isAnswerCorrect == false && uiState.selectedOption == option
+
+                                                                    val containerColor = when {
+                                                                        isSelectedCorrect -> Color(0xFF4CAF50)
+                                                                        isSelectedWrong -> Color(0xFFEF5350)
+                                                                        else -> Color(0xFFFF9800)
+                                                                    }
+
+                                                                    SquishyButton(
+                                                                        onClick = {
+                                                                            if (!uiState.isInputLocked) {
+                                                                                soundPlayer.playClick()
+                                                                                viewModel.selectAnswer(option)
+                                                                            }
+                                                                        },
+                                                                        size = optionSize,
+                                                                        shape = CircleShape,
+                                                                        color = containerColor,
+                                                                        elevation = 10.dp
+                                                                    ) {
+                                                                        Text(
+                                                                            text = option,
+                                                                            fontSize = if (isLandscape) 40.sp else 44.sp,
+                                                                            fontWeight = FontWeight.Black,
+                                                                            color = Color.White
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // BUTON HOME peste UI (nu ocupă spațiu)
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(16.dp),
+                                                contentAlignment = Alignment.BottomEnd
+                                            ) {
+                                                SquishyButton(
+                                                    onClick = { soundPlayer.playClick(); onBackToMenu() },
+                                                    size = 50.dp,
+                                                    shape = CircleShape
+                                                ) {
+                                                    Image(
+                                                        painter = painterResource(id = AlphabetUi.Icons.home),
+                                                        contentDescription = "Home",
+                                                        modifier = Modifier.size(28.dp)
+                                                    )
+                                                }
+                                            }
                     }
-                }
+}
 
             }
         }
@@ -437,165 +630,146 @@ private fun HeaderBar(
     totalQuestions: Int,
     attemptsLeft: Int,
     soundOn: Boolean,
-    onToggleSound: () -> Unit
+    onToggleSound: () -> Unit,
+    onHome: () -> Unit
 ) {
     val progress = if (totalQuestions > 0) (questionIndex + 1) / totalQuestions.toFloat() else 0f
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val questionText = "Întrebarea ${questionIndex + 1} / $totalQuestions"
+    val percentText = "${(progress * 100f).toInt()}%"
 
-
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        // --- SCOR + STELE (stânga) ---
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White.copy(alpha = 0.92f),
+            shadowElevation = 4.dp
         ) {
-            // Scor + stele
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = Color.White.copy(alpha = 0.92f),
-                shadowElevation = 4.dp
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = painterResource(id = AlphabetUi.Icons.star),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "$score",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFE65100)
-                    )
-
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "★".repeat(stars.coerceAtMost(10)),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFFFF9800)
-                    )
-                }
-            }
-
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.92f),
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.widthIn(max = if (isLandscape) 240.dp else 320.dp)
-                ) {
-                    Text(
-                        text = questionText,
-                        fontSize = if (isLandscape) 15.sp else 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // Încercări + Sunet
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = Color.White.copy(alpha = 0.92f),
-                    shadowElevation = 4.dp
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Șanse:",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF455A64)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val hearts = "❤".repeat(attemptsLeft.coerceAtLeast(0))
-                        Text(
-                            text = if (hearts.isEmpty()) "—" else hearts,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Black,
-                            color = Color(0xFFE53935)
-                        )
-                    }
-                }
-
+                Image(
+                    painter = painterResource(id = AlphabetUi.Icons.star),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = score.toString(),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF263238)
+                )
                 Spacer(modifier = Modifier.width(10.dp))
-
-                SquishyButton(onClick = onToggleSound, size = 42.dp, shape = CircleShape) {
-                    Image(
-                        painter = painterResource(id = AlphabetUi.Icons.soundOn),
-                        contentDescription = "Sound",
-                        modifier = Modifier
-                            .size(24.dp)
-                            .alpha(if (soundOn) 1f else 0.45f)
-                    )
-                }
+                Text(
+                    text = "★".repeat(stars.coerceAtMost(10)),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFF9800)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
-        // Progres
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.75f),
-            shadowElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth()
+        // --- PROGRES + ÎNTREBAREA (mijloc) ---
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(if (isLandscape) 42.dp else 46.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White.copy(alpha = 0.90f))
         ) {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Progres",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F)
-                    )
-                    Text(
-                        text = "${(progress * 100).toInt()}%",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF37474F)
-                    )
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = progress.coerceIn(0f, 1f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(999.dp)),
-                    color = Color(0xFFFF9800),
-                    trackColor = Color(0xFFECEFF1)
+            LinearProgressIndicator(
+                progress = progress.coerceIn(0f, 1f),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(999.dp)),
+                color = Color(0xFFFF9800),
+                trackColor = Color(0xFFECEFF1)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = questionText,
+                    fontSize = if (isLandscape) 14.sp else 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF37474F),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = percentText,
+                    fontSize = if (isLandscape) 13.sp else 14.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF37474F)
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        // --- ȘANSE (dreapta) ---
+        Surface(
+            shape = RoundedCornerShape(999.dp),
+            color = Color.White.copy(alpha = 0.92f),
+            shadowElevation = 4.dp
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Șanse:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF455A64)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                val hearts = "❤".repeat(attemptsLeft.coerceAtLeast(0))
+                Text(
+                    text = if (hearts.isEmpty()) "—" else hearts,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFE53935)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // --- TOGGLE SUNET ---
+        SquishyButton(onClick = onToggleSound, size = 42.dp, shape = CircleShape) {
+            Image(
+                painter = painterResource(id = AlphabetUi.Icons.soundOn),
+                contentDescription = "Sound",
+                modifier = Modifier
+                    .size(24.dp)
+                    .alpha(if (soundOn) 1f else 0.45f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // --- HOME ---
+        SquishyButton(onClick = onHome, size = 42.dp, shape = CircleShape) {
+            Image(
+                painter = painterResource(id = AlphabetUi.Icons.home),
+                contentDescription = "Home",
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
