@@ -37,7 +37,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.graphics.graphicsLayer // Corectat
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -69,17 +69,13 @@ fun ShadowMatchGameScreen(
 
     val density = LocalDensity.current
     val view = LocalView.current
-    val context = LocalContext.current // Adăugat context
-    val sound = remember { AlphabetSoundPlayer(context) } // Pasat context
+    val context = LocalContext.current
+    val sound = remember { AlphabetSoundPlayer(context) }
 
-    // Drop zones (centru in coordonate root)
     val dropZones = remember { mutableStateMapOf<Int, Offset>() }
     var hoveredTargetId by remember { mutableStateOf<Int?>(null) }
-
-    // burst mic pe target cand se potriveste
     var matchBurstId by remember { mutableStateOf<Int?>(null) }
 
-    // praguri (dp -> px)
     val magnetRangePx = with(density) { 56.dp.toPx() }
     val snapRangePx = with(density) { 42.dp.toPx() }
 
@@ -91,7 +87,6 @@ fun ShadowMatchGameScreen(
         viewModel.clearLastMatched()
     }
 
-    // Nivel complet -> urmatorul nivel automat
     LaunchedEffect(uiState.isLevelComplete) {
         if (uiState.isLevelComplete) {
             sound.playCorrect()
@@ -101,7 +96,6 @@ fun ShadowMatchGameScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background
         Image(
             painter = painterResource(R.drawable.bg_game_shapes),
             contentDescription = null,
@@ -109,7 +103,6 @@ fun ShadowMatchGameScreen(
             contentScale = ContentScale.Crop
         )
 
-        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -117,7 +110,7 @@ fun ShadowMatchGameScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SquishyButton(
+            ShadowSquishyButton(
                 onClick = {
                     sound.playClick()
                     onBack()
@@ -153,14 +146,12 @@ fun ShadowMatchGameScreen(
             }
         }
 
-        // Layout: tabla stanga + tava dreapta
         Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 92.dp, start = 18.dp, end = 18.dp, bottom = 18.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // BOARD
             Column(
                 modifier = Modifier
                     .weight(0.68f)
@@ -208,7 +199,6 @@ fun ShadowMatchGameScreen(
                 }
             }
 
-            // TRAY
             Column(
                 modifier = Modifier
                     .weight(0.32f)
@@ -259,15 +249,13 @@ fun ShadowMatchGameScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // reset
-                SquishyButton(
+                ShadowSquishyButton(
                     onClick = {
                         sound.playClick()
                         viewModel.resetGame()
                     },
                     size = 56.dp
                 ) {
-                    // Înlocuit resursa lipsă cu iconița home ca fallback
                     Image(
                         painter = painterResource(id = R.drawable.ui_button_home),
                         contentDescription = "Reset",
@@ -277,9 +265,8 @@ fun ShadowMatchGameScreen(
             }
         }
 
-        // Confetti overlay la final
         if (uiState.isLevelComplete) {
-            ConfettiBox(burstId = System.currentTimeMillis())
+            ShadowConfettiBox(burstId = System.currentTimeMillis())
         }
     }
 }
@@ -294,11 +281,7 @@ private fun ShadowTarget(
     val icon = remember(item.kind) { iconFor(item.kind) }
     val accent = remember(item.kind) { colorFor(item.kind) }
 
-    val burstScale by animateFloatAsState(
-        targetValue = if (burst) 1.12f else 1f,
-        animationSpec = tween(durationMillis = 260),
-        label = "burst"
-    )
+    val burstScale by animateFloatAsState(if (burst) 1.12f else 1f, tween(durationMillis = 260), label = "burst")
 
     Box(
         modifier = modifier
@@ -312,32 +295,10 @@ private fun ShadowTarget(
             .padding(12.dp),
         contentAlignment = Alignment.Center
     ) {
-        // umbra (aceeasi iconita, tint negru)
-        Icon(
-            imageVector = icon,
-            contentDescription = item.kind.label,
-            tint = Color.Black.copy(alpha = 0.55f),
-            modifier = Modifier.fillMaxSize(0.64f)
-        )
-
-        // piesa potrivita
+        Icon(icon, item.kind.label, tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.fillMaxSize(0.64f))
         if (item.isMatched) {
-            Icon(
-                imageVector = icon,
-                contentDescription = item.kind.label,
-                tint = accent,
-                modifier = Modifier
-                    .fillMaxSize(0.64f)
-                    .graphicsLayer(scaleX = burstScale, scaleY = burstScale)
-            )
-
-            // mic highlight
-            Box(
-                modifier = Modifier
-                    .size(18.dp)
-                    .align(Alignment.TopEnd)
-                    .background(Color.White.copy(alpha = 0.65f), CircleShape)
-            )
+            Icon(icon, item.kind.label, tint = accent, modifier = Modifier.fillMaxSize(0.64f).graphicsLayer(scaleX = burstScale, scaleY = burstScale))
+            Box(Modifier.size(18.dp).align(Alignment.TopEnd).background(Color.White.copy(alpha = 0.65f), CircleShape))
         }
     }
 }
@@ -356,77 +317,45 @@ private fun DraggablePiece(
 ) {
     val icon = remember(item.kind) { iconFor(item.kind) }
     val accent = remember(item.kind) { colorFor(item.kind) }
-
     var originCenter by remember { mutableStateOf<Offset?>(null) }
     var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
-
-    val lift by animateFloatAsState(
-        targetValue = if (dragging) 1.06f else 1f,
-        animationSpec = tween(durationMillis = 160),
-        label = "lift"
-    )
+    val lift by animateFloatAsState(if (dragging) 1.06f else 1f, tween(durationMillis = 160), label = "lift")
 
     Box(
         modifier = modifier
             .zIndex(if (dragging) 10f else 0f)
             .onGloballyPositioned { coords ->
                 val pos = coords.positionInRoot()
-                originCenter = Offset(
-                    x = pos.x + coords.size.width / 2f,
-                    y = pos.y + coords.size.height / 2f
-                )
+                originCenter = Offset(pos.x + coords.size.width / 2f, pos.y + coords.size.height / 2f)
             }
             .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
             .graphicsLayer(scaleX = lift, scaleY = lift)
             .pointerInput(item.id) {
                 detectDragGestures(
-                    onDragStart = {
-                        dragging = true
-                    },
+                    onDragStart = { dragging = true },
                     onDragEnd = {
                         dragging = false
                         val target = getTargetCenter()
                         val origin = originCenter
-                        if (target != null && origin != null) {
-                            val current = origin + offset
-                            val dist = hypot(current.x - target.x, current.y - target.y)
-                            if (dist <= snapRangePx) {
-                                offset = Offset.Zero
-                                onHoverClear()
-                                onDropSuccess()
-                                return@detectDragGestures
-                            }
+                        if (target != null && origin != null && hypot(origin.x + offset.x - target.x, origin.y + offset.y - target.y) <= snapRangePx) {
+                            offset = Offset.Zero; onHoverClear(); onDropSuccess()
+                        } else {
+                            offset = Offset.Zero; onHoverClear(); onDropFail()
                         }
-                        // return to tray
-                        offset = Offset.Zero
-                        onHoverClear()
-                        onDropFail()
                     },
-                    onDragCancel = {
-                        dragging = false
-                        offset = Offset.Zero
-                        onHoverClear()
-                    },
+                    onDragCancel = { dragging = false; offset = Offset.Zero; onHoverClear() },
                     onDrag = { change, dragAmount ->
                         change.consumeAllChanges()
-
-                        // miscarea de baza
                         offset += dragAmount
-
                         val target = getTargetCenter()
                         val origin = originCenter
                         if (target != null && origin != null) {
                             val current = origin + offset
-                            val dx = target.x - current.x
-                            val dy = target.y - current.y
-                            val dist = hypot(dx, dy)
-
-                            if (dist <= magnetRangePx) {
+                            val dx = target.x - current.x; val dy = target.y - current.y
+                            if (hypot(dx, dy) <= magnetRangePx) {
                                 onHover(item.id)
-                                // micro-asistenta catre centru (simte elegant)
-                                val assist = 0.12f
-                                offset += Offset(dx * assist, dy * assist)
+                                offset += Offset(dx * 0.12f, dy * 0.12f)
                             } else {
                                 onHoverClear()
                             }
@@ -440,12 +369,7 @@ private fun DraggablePiece(
             .padding(10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = item.kind.label,
-            tint = accent,
-            modifier = Modifier.fillMaxSize(0.70f)
-        )
+        Icon(icon, item.kind.label, tint = accent, modifier = Modifier.fillMaxSize(0.70f))
     }
 }
 
@@ -469,10 +393,10 @@ private fun colorFor(kind: ShadowKind) = when (kind) {
 
 private operator fun Offset.plus(other: Offset) = Offset(x + other.x, y + other.y)
 
-// --- LOCAL COPIES OF UTILS TO ENSURE COMPILATION ---
+// --- UTILS LOCALE REDENUMITE PENTRU A EVITA CONFLICTELE ---
 
 @Composable
-private fun SquishyButton(
+private fun ShadowSquishyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp? = null,
@@ -483,26 +407,12 @@ private fun SquishyButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val buttonScale by animateFloatAsState(
-        targetValue = if (isPressed) 0.86f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "btnScale"
-    )
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .scale(buttonScale)
-            .let { if (size != null) it.size(size) else it },
-        shape = shape,
-        color = color,
-        shadowElevation = elevation,
-        interactionSource = interactionSource
-    ) {
-        Box(contentAlignment = Alignment.Center, content = content)
-    }
+    val buttonScale by animateFloatAsState(if (isPressed) 0.86f else 1f, spring(stiffness = Spring.StiffnessMedium), label = "btnScale")
+    Surface(onClick = onClick, modifier = modifier.scale(buttonScale).let { if (size != null) it.size(size) else it }, shape = shape, color = color, shadowElevation = elevation, interactionSource = interactionSource) { Box(contentAlignment = Alignment.Center, content = content) }
 }
 
-data class ConfettiParticle(
+// REDENUMIT: ShadowConfettiParticle
+private data class ShadowConfettiParticle(
     val id: Int,
     var x: Float,
     var y: Float,
@@ -515,9 +425,9 @@ data class ConfettiParticle(
 )
 
 @Composable
-private fun ConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
+private fun ShadowConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
     val colors = listOf(Color(0xFFFFC107), Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFFFF5722))
-    val particles = remember { mutableStateListOf<ConfettiParticle>() }
+    val particles = remember { mutableStateListOf<ShadowConfettiParticle>() }
     val density = LocalDensity.current
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = with(density) { maxWidth.toPx() }
@@ -528,36 +438,15 @@ private fun ConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @
                 repeat(80) { id ->
                     val startX = Random.nextFloat() * widthPx
                     val startY = -with(density) { 40.dp.toPx() }
-                    particles.add(
-                        ConfettiParticle(
-                            id = id,
-                            x = startX,
-                            y = startY,
-                            color = colors.random(),
-                            scale = Random.nextFloat() * 0.4f + 0.6f,
-                            rotationSpeed = (Random.nextFloat() - 0.5f) * 260f,
-                            currentRotation = Random.nextFloat() * 360f,
-                            vx = (Random.nextFloat() - 0.5f) * 220f,
-                            vy = 720f + (Random.nextFloat() * 320f)
-                        )
-                    )
+                    particles.add(ShadowConfettiParticle(id, startX, startY, colors.random(), Random.nextFloat() * 0.4f + 0.6f, (Random.nextFloat() - 0.5f) * 260f, Random.nextFloat() * 360f, (Random.nextFloat() - 0.5f) * 220f, 720f + (Random.nextFloat() * 320f)))
                 }
                 var lastTime = withFrameNanos { it }
                 while (isActive && particles.isNotEmpty()) {
                     withFrameNanos { now ->
-                        val dt = (now - lastTime) / 1_000_000_000f
-                        lastTime = now
+                        val dt = (now - lastTime) / 1_000_000_000f; lastTime = now
                         val t = now / 1_000_000_000f
-                        val newParticles = particles.map { p ->
-                            val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat()
-                            p.apply {
-                                x += (vx + sway) * dt
-                                y += vy * dt
-                                currentRotation += rotationSpeed * dt
-                            }
-                        }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
-                        particles.clear()
-                        particles.addAll(newParticles)
+                        val newParticles = particles.map { p -> val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
+                        particles.clear(); particles.addAll(newParticles)
                     }
                 }
             }
@@ -565,20 +454,8 @@ private fun ConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @
         Box(modifier = Modifier.fillMaxSize()) {
             content()
             if (particles.isNotEmpty()) {
-                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
-                    particles.forEach { p ->
-                        withTransform({
-                            translate(p.x, p.y)
-                            rotate(p.currentRotation)
-                            scale(p.scale, p.scale)
-                        }) {
-                            drawRect(
-                                color = p.color,
-                                topLeft = Offset(-12f, -8f),
-                                size = Size(24f, 16f)
-                            )
-                        }
-                    }
+                Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
+                    particles.forEach { p -> withTransform({ translate(p.x, p.y); rotate(p.currentRotation); scale(p.scale, p.scale) }) { drawRect(p.color, Offset(-12f, -8f), Size(24f, 16f)) } }
                 }
             }
         }
