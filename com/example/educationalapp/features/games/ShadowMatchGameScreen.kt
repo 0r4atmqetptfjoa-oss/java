@@ -2,10 +2,13 @@ package com.example.educationalapp.features.games
 
 import android.view.SoundEffectConstants
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas // Import adăugat
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,12 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +28,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.withTransform // Import adăugat
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
@@ -45,16 +45,19 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity // Import adăugat
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
 import com.example.educationalapp.alphabet.AlphabetSoundPlayer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -77,13 +80,13 @@ fun ShadowMatchGameScreen(
     var hoveredTargetId by remember { mutableStateOf<Int?>(null) }
     var matchBurstId by remember { mutableStateOf<Int?>(null) }
 
-    val magnetRangePx = with(density) { 56.dp.toPx() }
-    val snapRangePx = with(density) { 42.dp.toPx() }
+    val magnetRangePx = with(density) { 64.dp.toPx() } // Magnet mai puternic
+    val snapRangePx = with(density) { 48.dp.toPx() }
 
     LaunchedEffect(uiState.lastMatchedId) {
         val id = uiState.lastMatchedId ?: return@LaunchedEffect
         matchBurstId = id
-        kotlinx.coroutines.delay(350L)
+        delay(400)
         if (matchBurstId == id) matchBurstId = null
         viewModel.clearLastMatched()
     }
@@ -91,12 +94,13 @@ fun ShadowMatchGameScreen(
     LaunchedEffect(uiState.isLevelComplete) {
         if (uiState.isLevelComplete) {
             sound.playCorrect()
-            kotlinx.coroutines.delay(900L)
+            delay(1200)
             viewModel.nextLevel()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Background
         Image(
             painter = painterResource(R.drawable.bg_game_shapes),
             contentDescription = null,
@@ -104,6 +108,7 @@ fun ShadowMatchGameScreen(
             contentScale = ContentScale.Crop
         )
 
+        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -112,10 +117,7 @@ fun ShadowMatchGameScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             ShadowSquishyButton(
-                onClick = {
-                    sound.playClick()
-                    onBack()
-                },
+                onClick = { sound.playClick(); onBack() },
                 size = 56.dp
             ) {
                 Image(
@@ -127,55 +129,48 @@ fun ShadowMatchGameScreen(
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Umbre 2026",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color.White
+                    text = "Găsește Umbra",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge
                 )
                 Text(
                     text = "Nivel ${uiState.level}",
-                    style = MaterialTheme.typography.titleMedium,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = 0.9f)
                 )
             }
 
-            IconButton(onClick = { sound.playClick(); onBack() }) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    tint = Color.White
-                )
-            }
+            // Placeholder dreapta pentru simetrie
+            Spacer(Modifier.size(56.dp))
         }
 
+        // Layout Principal
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 92.dp, start = 18.dp, end = 18.dp, bottom = 18.dp),
+                .padding(top = 80.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // TABLA CU UMBRE (Stânga - mai lată)
             Column(
                 modifier = Modifier
-                    .weight(0.68f)
+                    .weight(0.6f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.16f))
-                    .border(2.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.2f))
+                    .border(2.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "Potrivește forma peste umbră",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
+                // Aranjăm umbrele într-un Grid flexibil
                 val rows = uiState.targets.chunked(2)
                 rows.forEach { row ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         row.forEach { item ->
                             ShadowTarget(
@@ -183,8 +178,7 @@ fun ShadowMatchGameScreen(
                                 isHovered = hoveredTargetId == item.id,
                                 burst = matchBurstId == item.id,
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
+                                    .size(130.dp) // Mărime fixă generoasă
                                     .onGloballyPositioned { coords ->
                                         val pos = coords.positionInRoot()
                                         val center = Offset(
@@ -195,72 +189,60 @@ fun ShadowMatchGameScreen(
                                     }
                             )
                         }
-                        if (row.size < 2) Spacer(modifier = Modifier.weight(1f))
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
 
+            // TAVA CU PIESE (Dreapta - coloană)
             Column(
                 modifier = Modifier
-                    .weight(0.32f)
+                    .weight(0.4f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.14f))
-                    .border(2.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(24.dp))
-                    .padding(12.dp)
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .border(2.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Piese",
+                    text = "Animale",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
                 )
-                Spacer(modifier = Modifier.height(10.dp))
-
-                val trayRows = uiState.tray.chunked(2)
-                trayRows.forEach { row ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        row.forEach { item ->
-                            DraggablePiece(
-                                item = item,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f),
-                                magnetRangePx = magnetRangePx,
-                                snapRangePx = snapRangePx,
-                                getTargetCenter = { dropZones[item.id] },
-                                onHover = { hoveredTargetId = it },
-                                onHoverClear = { if (hoveredTargetId == item.id) hoveredTargetId = null },
-                                onDropSuccess = {
-                                    view.playSoundEffect(SoundEffectConstants.CLICK)
-                                    sound.playCorrect()
-                                    viewModel.onMatched(item.id)
-                                },
-                                onDropFail = {
-                                    sound.playWrong()
-                                }
-                            )
-                        }
-                        if (row.size < 2) Spacer(modifier = Modifier.weight(1f))
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
+                
+                // Lista de piese de tras
+                LazyGridLikeColumn(items = uiState.tray) { item ->
+                    DraggablePiece(
+                        item = item,
+                        magnetRangePx = magnetRangePx,
+                        snapRangePx = snapRangePx,
+                        getTargetCenter = { dropZones[item.id] },
+                        onHover = { hoveredTargetId = it },
+                        onHoverClear = { if (hoveredTargetId == item.id) hoveredTargetId = null },
+                        onDropSuccess = {
+                            view.playSoundEffect(SoundEffectConstants.CLICK)
+                            sound.playCorrect()
+                            viewModel.onMatched(item.id)
+                        },
+                        onDropFail = { sound.playWrong() }
+                    )
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
-
+                // Reset Button - Folosim icon_alphabet_replay care există sigur
                 ShadowSquishyButton(
                     onClick = {
                         sound.playClick()
                         viewModel.resetGame()
                     },
-                    size = 56.dp
+                    size = 64.dp
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.ui_button_home),
+                        painter = painterResource(id = R.drawable.icon_alphabet_replay),
                         contentDescription = "Reset",
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(40.dp)
                     )
                 }
             }
@@ -272,6 +254,28 @@ fun ShadowMatchGameScreen(
     }
 }
 
+// Helper simplu pentru grid vertical
+@Composable
+fun LazyGridLikeColumn(
+    items: List<ShadowMatchItem>,
+    content: @Composable (ShadowMatchItem) -> Unit
+) {
+    // Afișăm câte 2 pe rând dacă sunt multe, sau una sub alta
+    val chunks = items.chunked(2)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        chunks.forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                row.forEach { item ->
+                    content(item)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ShadowTarget(
     item: ShadowMatchItem,
@@ -279,27 +283,50 @@ private fun ShadowTarget(
     burst: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val icon = remember(item.kind) { iconFor(item.kind) }
-    val accent = remember(item.kind) { colorFor(item.kind) }
-
-    val burstScale by animateFloatAsState(if (burst) 1.12f else 1f, tween(durationMillis = 260), label = "burst")
+    val burstScale by animateFloatAsState(if (burst) 1.2f else 1f, tween(300), label = "burst")
+    
+    // Pulsare ușoară pentru umbrele necompletate ca indiciu
+    val pulse by rememberInfiniteTransition().animateFloat(
+        initialValue = 1f, targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(tween(1500), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "pulse"
+    )
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.10f))
-            .border(
-                width = if (isHovered) 3.dp else 2.dp,
-                color = if (isHovered) Color.White.copy(alpha = 0.95f) else Color.White.copy(alpha = 0.30f),
-                shape = RoundedCornerShape(20.dp)
-            )
-            .padding(12.dp),
+            .scale(if (item.isMatched) burstScale else pulse)
+            .clip(RoundedCornerShape(16.dp))
+            // Dacă e hover, punem un glow
+            .background(if (isHovered) Color.Yellow.copy(alpha = 0.3f) else Color.Transparent)
+            .padding(8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, item.kind.label, tint = Color.Black.copy(alpha = 0.55f), modifier = Modifier.fillMaxSize(0.64f))
+        // 1. UMBRA (Fundal)
+        Image(
+            painter = painterResource(id = item.kind.shadowRes),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+            colorFilter = ColorFilter.tint(Color.Black.copy(alpha = 0.6f)) // Întunecăm umbra pentru contrast
+        )
+
+        // 2. IMAGINEA COLORATĂ (Dacă e potrivită)
         if (item.isMatched) {
-            Icon(icon, item.kind.label, tint = accent, modifier = Modifier.fillMaxSize(0.64f).graphicsLayer(scaleX = burstScale, scaleY = burstScale))
-            Box(Modifier.size(18.dp).align(Alignment.TopEnd).background(Color.White.copy(alpha = 0.65f), CircleShape))
+            Image(
+                painter = painterResource(id = item.kind.imageRes),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+            // Stea de succes
+            Image(
+                painter = painterResource(R.drawable.ui_icon_star),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(32.dp)
+                    .offset(x = 8.dp, y = (-8).dp)
+            )
         }
     }
 }
@@ -307,7 +334,6 @@ private fun ShadowTarget(
 @Composable
 private fun DraggablePiece(
     item: ShadowMatchItem,
-    modifier: Modifier,
     magnetRangePx: Float,
     snapRangePx: Float,
     getTargetCenter: () -> Offset?,
@@ -316,22 +342,32 @@ private fun DraggablePiece(
     onDropSuccess: () -> Unit,
     onDropFail: () -> Unit,
 ) {
-    val icon = remember(item.kind) { iconFor(item.kind) }
-    val accent = remember(item.kind) { colorFor(item.kind) }
     var originCenter by remember { mutableStateOf<Offset?>(null) }
     var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
     var dragging by remember { mutableStateOf(false) }
-    val lift by animateFloatAsState(if (dragging) 1.06f else 1f, tween(durationMillis = 160), label = "lift")
+
+    val scale by animateFloatAsState(if (dragging) 1.2f else 1f, tween(200), label = "lift")
+    val rotation by animateFloatAsState(if (dragging) -10f else 0f, tween(200), label = "tilt")
 
     Box(
-        modifier = modifier
-            .zIndex(if (dragging) 10f else 0f)
+        modifier = Modifier
+            .size(100.dp) // Mărimea piesei în tavă
+            .zIndex(if (dragging) 100f else 1f)
             .onGloballyPositioned { coords ->
-                val pos = coords.positionInRoot()
-                originCenter = Offset(pos.x + coords.size.width / 2f, pos.y + coords.size.height / 2f)
+                if (!dragging) {
+                    val pos = coords.positionInRoot()
+                    originCenter = Offset(
+                        x = pos.x + coords.size.width / 2f,
+                        y = pos.y + coords.size.height / 2f
+                    )
+                }
             }
             .offset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
-            .graphicsLayer(scaleX = lift, scaleY = lift)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                rotationZ = rotation
+            }
             .pointerInput(item.id) {
                 detectDragGestures(
                     onDragStart = { dragging = true },
@@ -339,24 +375,33 @@ private fun DraggablePiece(
                         dragging = false
                         val target = getTargetCenter()
                         val origin = originCenter
-                        if (target != null && origin != null && hypot(origin.x + offset.x - target.x, origin.y + offset.y - target.y) <= snapRangePx) {
-                            offset = Offset.Zero; onHoverClear(); onDropSuccess()
+                        // Verificăm distanța de fixare
+                        if (target != null && origin != null && 
+                            hypot(origin.x + offset.x - target.x, origin.y + offset.y - target.y) <= snapRangePx) {
+                            offset = Offset.Zero
+                            onHoverClear()
+                            onDropSuccess()
                         } else {
-                            offset = Offset.Zero; onHoverClear(); onDropFail()
+                            // Revine în tavă
+                            offset = Offset.Zero
+                            onHoverClear()
+                            onDropFail()
                         }
                     },
                     onDragCancel = { dragging = false; offset = Offset.Zero; onHoverClear() },
                     onDrag = { change, dragAmount ->
                         change.consumeAllChanges()
                         offset += dragAmount
+                        
+                        // Magnet effect visual
                         val target = getTargetCenter()
                         val origin = originCenter
                         if (target != null && origin != null) {
-                            val current = origin + offset
-                            val dx = target.x - current.x; val dy = target.y - current.y
+                            val currentPos = origin + offset
+                            val dx = target.x - currentPos.x
+                            val dy = target.y - currentPos.y
                             if (hypot(dx, dy) <= magnetRangePx) {
                                 onHover(item.id)
-                                offset += Offset(dx * 0.12f, dy * 0.12f)
                             } else {
                                 onHoverClear()
                             }
@@ -364,37 +409,20 @@ private fun DraggablePiece(
                     }
                 )
             }
-            .clip(RoundedCornerShape(20.dp))
-            .shadow(if (dragging) 14.dp else 8.dp, RoundedCornerShape(20.dp))
-            .background(Color.White)
-            .padding(10.dp),
-        contentAlignment = Alignment.Center
     ) {
-        Icon(icon, item.kind.label, tint = accent, modifier = Modifier.fillMaxSize(0.70f))
+        // Imaginea piesei de mutat
+        Image(
+            painter = painterResource(id = item.kind.imageRes),
+            contentDescription = item.kind.label,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
     }
-}
-
-private fun iconFor(kind: ShadowKind) = when (kind) {
-    ShadowKind.HEART -> Icons.Filled.Favorite
-    ShadowKind.STAR -> Icons.Filled.Star
-    ShadowKind.INFO -> Icons.Filled.Info
-    ShadowKind.HOME -> Icons.Filled.Home
-    ShadowKind.FACE -> Icons.Filled.Face
-    ShadowKind.BUILD -> Icons.Filled.Build
-}
-
-private fun colorFor(kind: ShadowKind) = when (kind) {
-    ShadowKind.HEART -> Color(0xFFE74C3C)
-    ShadowKind.STAR -> Color(0xFFFFC107)
-    ShadowKind.INFO -> Color(0xFF29B6F6)
-    ShadowKind.HOME -> Color(0xFF66BB6A)
-    ShadowKind.FACE -> Color(0xFFAB47BC)
-    ShadowKind.BUILD -> Color(0xFFFF7043)
 }
 
 private operator fun Offset.plus(other: Offset) = Offset(x + other.x, y + other.y)
 
-// --- UTILS LOCALE REDENUMITE PENTRU A EVITA CONFLICTELE ---
+// --- COMPONENTE LOCALE ---
 
 @Composable
 private fun ShadowSquishyButton(
@@ -432,8 +460,8 @@ private fun ShadowConfettiBox(burstId: Long, modifier: Modifier = Modifier, cont
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
-        val startY = with(density) { -40.dp.toPx() }
-        val endYLimit = heightPx + with(density) { 120.dp.toPx() }
+        val startY = with(density) { -40.dp.toPx() } // Fix explicit
+        val endYLimit = heightPx + with(density) { 120.dp.toPx() } // Fix explicit
 
         LaunchedEffect(burstId) {
             particles.clear()

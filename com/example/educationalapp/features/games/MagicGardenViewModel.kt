@@ -13,30 +13,30 @@ import kotlin.math.max
 import kotlin.math.min
 
 enum class GardenStage {
-    GRASS,      // need digging
-    DUG,        // need seeds
-    SEEDED,     // need watering
-    WATERED,    // need sun (move cloud)
-    GROWN       // harvest / next
+    DIRT,       // Pământ plat (trebuie săpat)
+    DUG,        // Groapă (trebuie semințe)
+    SEEDED,     // Astupat (trebuie apă)
+    SPROUT,     // Vlăstar (trebuie soare/nor mutat)
+    GROWN       // Plantă matură (trebuie culeasă)
 }
 
 enum class ToolType { SHOVEL, SEEDS, WATER }
 
+// Folosim resursele din categoria "Magic Garden / Plants" din CSV [cite: 8]
 enum class PlantType(val imageRes: Int) {
-    STRAWBERRY(R.drawable.char_strawberry_happy),
-    SUN(R.drawable.char_sun_happy),
-    CACTUS(R.drawable.char_cactus_happy),
-    CARROT(R.drawable.char_carrot_happy),
-    APPLE(R.drawable.food_apple)
+    CARROT(R.drawable.plant_carrot),
+    PUMPKIN(R.drawable.plant_pumpkin),
+    SUNFLOWER(R.drawable.plant_sunflower),
+    WATERMELON(R.drawable.plant_watermelon)
 }
 
 data class MagicGardenUiState(
-    val stage: GardenStage = GardenStage.GRASS,
-    val currentPlant: PlantType = PlantType.STRAWBERRY,
-    val actionProgress: Float = 0f,          // 0..1 for current stage action (dig/seed/water)
-    val isCloudMoved: Boolean = false,       // sun revealed
-    val harvestCount: Int = 0,               // session counter
-    val isCelebrating: Boolean = false       // short celebration window
+    val stage: GardenStage = GardenStage.DIRT,
+    val currentPlant: PlantType = PlantType.CARROT,
+    val actionProgress: Float = 0f,          // 0..1 progresul acțiunii curente
+    val isCloudMoved: Boolean = false,       // soarele a fost descoperit
+    val harvestCount: Int = 0,               // contor recoltă
+    val isCelebrating: Boolean = false       // animație finală
 )
 
 @HiltViewModel
@@ -54,7 +54,7 @@ class MagicGardenViewModel @Inject constructor() : ViewModel() {
     private fun startNewRound(resetCounter: Boolean = false) {
         val count = if (resetCounter) 0 else _uiState.value.harvestCount
         _uiState.value = MagicGardenUiState(
-            stage = GardenStage.GRASS,
+            stage = GardenStage.DIRT,
             currentPlant = randomPlant(),
             actionProgress = 0f,
             isCloudMoved = false,
@@ -68,35 +68,28 @@ class MagicGardenViewModel @Inject constructor() : ViewModel() {
     }
 
     fun currentTool(): ToolType? = when (_uiState.value.stage) {
-        GardenStage.GRASS -> ToolType.SHOVEL
+        GardenStage.DIRT -> ToolType.SHOVEL
         GardenStage.DUG -> ToolType.SEEDS
         GardenStage.SEEDED -> ToolType.WATER
         else -> null
     }
 
-    /**
-     * Adds progress for the current stage action.
-     * Call this continuously while the correct tool is "working" over the garden patch.
-     */
     fun addActionProgress(delta: Float) {
         val s = _uiState.value
         val stage = s.stage
-        if (stage != GardenStage.GRASS && stage != GardenStage.DUG && stage != GardenStage.SEEDED) return
+        // Doar primele 3 stadii necesită unelte
+        if (stage != GardenStage.DIRT && stage != GardenStage.DUG && stage != GardenStage.SEEDED) return
 
         val next = min(1f, max(0f, s.actionProgress + delta))
         if (next >= 1f) {
-            // Stage complete -> advance
+            // Avansăm la stadiul următor
             val newStage = when (stage) {
-                GardenStage.GRASS -> GardenStage.DUG
+                GardenStage.DIRT -> GardenStage.DUG
                 GardenStage.DUG -> GardenStage.SEEDED
-                GardenStage.SEEDED -> GardenStage.WATERED
+                GardenStage.SEEDED -> GardenStage.SPROUT
                 else -> stage
             }
             _uiState.value = s.copy(stage = newStage, actionProgress = 0f)
-            if (newStage == GardenStage.WATERED) {
-                // small pause before user moves cloud; keeps UX clear
-                return
-            }
         } else {
             _uiState.value = s.copy(actionProgress = next)
         }
@@ -104,10 +97,10 @@ class MagicGardenViewModel @Inject constructor() : ViewModel() {
 
     fun onCloudMovedAway() {
         val s = _uiState.value
-        if (s.stage != GardenStage.WATERED || s.isCloudMoved) return
+        if (s.stage != GardenStage.SPROUT || s.isCloudMoved) return
         viewModelScope.launch {
             _uiState.value = s.copy(isCloudMoved = true)
-            delay(450) // let rays appear
+            delay(450) // așteptăm să apară razele
             _uiState.value = _uiState.value.copy(stage = GardenStage.GROWN, isCelebrating = true)
             delay(900)
             _uiState.value = _uiState.value.copy(isCelebrating = false)
@@ -121,7 +114,7 @@ class MagicGardenViewModel @Inject constructor() : ViewModel() {
             _uiState.value = s.copy(isCelebrating = true)
             delay(650)
             _uiState.value = MagicGardenUiState(
-                stage = GardenStage.GRASS,
+                stage = GardenStage.DIRT,
                 currentPlant = randomPlant(),
                 actionProgress = 0f,
                 isCloudMoved = false,
