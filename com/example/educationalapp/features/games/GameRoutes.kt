@@ -1,39 +1,39 @@
 package com.example.educationalapp.features.games
 
 /**
- * Centralized route names for all mini-games.
+ * Rute centralizate pentru mini-jocuri.
+ * IMPORTANT: Valorile de aici trebuie să fie IDENTICE cu cele din Screen.kt
+ * pentru ca navigarea din Meniu să funcționeze corect.
  */
 object GameRoutes {
-    const val ALPHABET = "game_alphabet"
+    // Graph-uri
     const val ALPHABET_GRAPH = "game_alphabet_graph"
-    const val ALPHABET_MENU = "game_alphabet_menu"
-    const val ALPHABET_GAME = "game_alphabet_game"
-    const val ALPHABET_QUIZ = "game_alphabet_quiz" // Adăugat pentru consistență cu AppNavigation
 
-    const val PEEKABOO = "game_peekaboo"
-    const val COLORS = "game_colors"
-    const val SHAPES = "game_shapes"
-    const val PUZZLE = "game_puzzle"
-    const val MEMORY = "game_memory"
-    const val HIDDEN_OBJECTS = "game_hidden_objects"
-    const val SORTING = "game_sorting"
-    const val INSTRUMENTS = "game_instruments"
-    const val SEQUENCE = "game_sequence"
-    const val MATH = "game_math"
-    const val CODING = "game_coding"
-    const val BLOCKS = "game_blocks"
-    const val COOKING = "game_cooking"
-    const val MAZE = "game_maze"
-    const val SHADOW_MATCH = "game_shadow_match"
-    const val ANIMAL_SORTING = "game_animal_sorting"
-    const val EMOTIONS = "game_emotions"
-    const val INSTRUMENT_GUESS = "game_instrument_guess"
+    // Jocuri
+    const val ALPHABET_QUIZ = "alphabet_quiz" // Era "game_alphabet_quiz"
+    const val MATH = "math_game"              // Era "game_math"
+    const val COLORS = "color_match"          // Era "game_colors"
+    const val SHAPES = "shape_match"          // Era "game_shapes"
+    const val PUZZLE = "puzzle"               // Era "game_puzzle"
+    const val MEMORY = "memory_game"          // Era "game_memory"
+    const val ANIMAL_SORTING = "animal_sorting_game"
+    
+    // FIXAT: Acum coincide cu Screen.CookingGame.route ("cooking_game")
+    const val COOKING = "cooking_game"        
+    
+    const val INSTRUMENTS = "instruments_game"
+    const val BLOCKS = "blocks_game"
+    const val MAZE = "maze_game"
+    const val HIDDEN_OBJECTS = "hidden_objects_game"
+    const val SORTING = "sorting_game"
+    const val SHADOW_MATCH = "shadow_match_game"
+    const val CODING = "coding_game"
+    const val SEQUENCE = "sequence_memory_game"
 
-    // Imported/extra mini-games
+    // Jocuri Extra / Noi (acestea nu par să fie în Screen.kt, deci le lăsăm așa)
+    const val PEEKABOO = "game_peekaboo" 
     const val EGG_SURPRISE = "game_egg_surprise"
     const val FEED_MONSTER = "game_feed_monster"
     const val ANIMAL_BAND = "game_animal_band"
-    
-    // NOU:
     const val BALLOON_POP = "game_balloon_pop"
 }
