@@ -127,7 +127,8 @@ fun PuzzleGameScreen(
     // Auto-start / auto-next when layout is ready
     var startedLayoutKey by remember { mutableStateOf("") }
     LaunchedEffect(boardSizePx, trayWidthPx) {
-        if (boardSizePx.width > 0f && boardSizePx.height > 0f && trayWidthPx > 0f) {
+        // Safe check: pornim doar dacă avem dimensiuni valide
+        if (boardSizePx.width > 10f && boardSizePx.height > 10f && trayWidthPx > 10f) {
             val key = "${boardSizePx.width.toInt()}x${boardSizePx.height.toInt()}_${trayWidthPx.toInt()}"
             if (key != startedLayoutKey) {
                 startedLayoutKey = key
@@ -211,8 +212,10 @@ fun PuzzleGameScreen(
                     themeResId = uiState.currentThemeResId,
                     pieces = uiState.pieces,
                     onGloballyPositioned = { offset, size ->
-                        boardOffset = offset
-                        boardSizePx = size
+                        // FIX CRITIC: Actualizăm doar dacă s-a schimbat, 
+                        // altfel intrăm în buclă infinită de recomposition (ANR)
+                        if (boardOffset != offset) boardOffset = offset
+                        if (boardSizePx != size) boardSizePx = size
                     }
                 )
 
