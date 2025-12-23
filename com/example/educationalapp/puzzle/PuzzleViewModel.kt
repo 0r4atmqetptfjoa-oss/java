@@ -84,8 +84,6 @@ class PuzzleViewModel @Inject constructor() : ViewModel() {
         )
     }
 
-    }
-
     fun startGame(
         context: Context,
         boardWidth: Float,

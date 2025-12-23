@@ -415,7 +415,8 @@ private fun BoardBox(
                 )
                 if (outline is Outline.Generic) {
                     val p = Path()
-                    p.addPath(outline.path, piece.targetX, piece.targetY)
+                    // FIX: Folosim Offset pentru a muta path-ul
+                    p.addPath(outline.path, Offset(piece.targetX, piece.targetY))
                     drawPath(
                         path = p,
                         color = Color.White.copy(alpha = 0.25f),

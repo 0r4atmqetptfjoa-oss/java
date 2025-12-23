@@ -19,10 +19,10 @@ object PuzzleAssets {
         PuzzleTheme("fruits", R.drawable.puzzle_fruits)
     )
 
-        /** Lista completă de teme (folosită pentru shuffle fără repetare). */
+    /** Lista completă de teme (folosită pentru shuffle fără repetare). */
     fun allThemes(): List<PuzzleTheme> = themes
 
-fun getRandomTheme(): PuzzleTheme {
+    fun getRandomTheme(): PuzzleTheme {
         return themes.random()
     }
 }
