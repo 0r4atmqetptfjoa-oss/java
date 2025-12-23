@@ -99,7 +99,6 @@ fun MagicGardenGameScreen(
                 contentScale = ContentScale.Crop
             )
 
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -118,7 +117,6 @@ fun MagicGardenGameScreen(
                 )
             }
 
-            // Sun
             val sunAlpha by animateFloatAsState(if (uiState.isCloudMoved || uiState.stage == GardenStage.GROWN) 1f else 0.25f, tween(450), label = "sunAlpha")
             val sunPulse by rememberInfiniteTransition(label = "sun").animateFloat(1f, 1.06f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "sunPulse")
 
@@ -129,7 +127,6 @@ fun MagicGardenGameScreen(
                 }
             }
 
-            // Cloud - Enabled only at SPROUT stage
             DraggableCloud(
                 isEnabled = (uiState.stage == GardenStage.SPROUT),
                 isMovedAway = uiState.isCloudMoved,
@@ -139,7 +136,6 @@ fun MagicGardenGameScreen(
                 }
             )
 
-            // Garden Patch
             GardenPatch(
                 stage = uiState.stage,
                 plantRes = uiState.currentPlant.imageRes,
@@ -164,7 +160,6 @@ fun MagicGardenGameScreen(
                     }
             )
 
-            // Tools
             ToolShelf(
                 currentTool = viewModel.currentTool(),
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
@@ -222,7 +217,6 @@ private fun GardenPatch(
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        // Corectat: Folosim DIRT în loc de GRASS
         val dirtRes = when (stage) {
             GardenStage.DIRT -> R.drawable.prop_dirt_flat
             GardenStage.DUG -> R.drawable.prop_dirt_hole
@@ -232,10 +226,9 @@ private fun GardenPatch(
         Image(painter = painterResource(id = dirtRes), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
 
         when (stage) {
-            GardenStage.DIRT -> {} // Empty
-            GardenStage.DUG -> {} // Hole is in bg
-            GardenStage.SEEDED -> {} // Seeds hidden
-            // Corectat: Folosim SPROUT în loc de WATERED
+            GardenStage.DIRT -> {} 
+            GardenStage.DUG -> {} 
+            GardenStage.SEEDED -> {} 
             GardenStage.SPROUT -> {
                 Image(painter = painterResource(id = R.drawable.prop_plant_sprout), contentDescription = "Sprout", modifier = Modifier.size(130.dp).offset(y = (-10).dp))
             }
@@ -245,7 +238,6 @@ private fun GardenPatch(
             }
         }
 
-        // Corectat: Verificare DIRT/DUG/SEEDED
         if (stage == GardenStage.DIRT || stage == GardenStage.DUG || stage == GardenStage.SEEDED) {
             val label = when (stage) {
                 GardenStage.DIRT -> "SAPĂ"
@@ -331,11 +323,13 @@ private fun DraggableTool2026(toolType: ToolType, imageRes: Int, patchCenter: Of
                         offsetX += dragAmount.x; offsetY += dragAmount.y
                         if (patchCenter != Offset.Zero && initialCenter != Offset.Zero) {
                             val cur = initialCenter + Offset(offsetX, offsetY)
-                            val dist = kotlin.math.sqrt(kotlin.math.pow((cur.x - patchCenter.x).toDouble(), 2.0) + kotlin.math.pow((cur.y - patchCenter.y).toDouble(), 2.0)).toFloat()
+                            // FIX: Folosim getDistance() pentru claritate si siguranta
+                            val dist = (cur - patchCenter).getDistance()
+                            
                             if (dist < 200f) {
                                 val intensity = (abs(dragAmount.x) + abs(dragAmount.y)).coerceIn(1f, 40f)
                                 onWorkTick(intensity)
-                                if (intensity > 20f) onMilestone(Offset(cur.x - patchCenter.x, cur.y - patchCenter.y))
+                                if (intensity > 20f) onMilestone(cur - patchCenter)
                             }
                         }
                     }
@@ -403,6 +397,7 @@ private fun MagicConfettiBox(burstId: Long, modifier: Modifier = Modifier, conte
                 while (isActive && particles.isNotEmpty()) {
                     withFrameNanos { now ->
                         val dt = (now - lastTime) / 1_000_000_000f; lastTime = now
+                        val t = now / 1_000_000_000f
                         val newParticles = particles.map { p -> val sway = (sin((now / 1e9 * 4.8 + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < endYLimit }
                         particles.clear(); particles.addAll(newParticles)
                     }
