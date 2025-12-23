@@ -48,9 +48,6 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
 import com.example.educationalapp.alphabet.AlphabetSoundPlayer
-// NOTĂ: Am eliminat importurile către alphabet.ConfettiBox și SquishyButton
-// Le-am definit local la finalul fișierului.
-
 import kotlinx.coroutines.isActive
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -76,8 +73,6 @@ fun CookingGameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    // Putem folosi sunetele din Alphabet sau un SoundPlayer generic. 
-    // Deocamdată păstrăm AlphabetSoundPlayer dacă e accesibil (el e public de obicei).
     val soundPlayer = remember { AlphabetSoundPlayer(context) }
 
     // Confetti final
@@ -111,7 +106,6 @@ fun CookingGameScreen(
     val density = LocalDensity.current
     val toppingSizePx = with(density) { 46.dp.toPx() }
 
-    // Folosim ConfettiBox definit local la finalul fișierului
     ConfettiBox(burstId = confettiBurstId) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -130,7 +124,7 @@ fun CookingGameScreen(
                 modifier = Modifier
                     .padding(16.dp)
                     .size(64.dp)
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopStart) // Aici e OK, suntem în Box
                     .clickable { onBack() }
             )
 
@@ -138,7 +132,7 @@ fun CookingGameScreen(
             StageStepper(
                 stage = uiState.stage,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
+                    .align(Alignment.TopCenter) // Aici e OK
                     .padding(top = 16.dp)
             )
 
@@ -233,12 +227,14 @@ fun CookingGameScreen(
             }
 
             // 3) BOTTOM PANEL
+            // FIX: Aplicăm align aici, unde BottomPanel este apelat (în Box)
             BottomPanel(
                 uiState = uiState,
                 viewModel = viewModel,
                 pizzaCenter = pizzaCenter,
                 pizzaRadius = pizzaRadius,
-                soundPlayer = soundPlayer
+                soundPlayer = soundPlayer,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }
@@ -302,11 +298,11 @@ private fun BottomPanel(
     viewModel: CookingGameViewModel,
     pizzaCenter: Offset,
     pizzaRadius: Float,
-    soundPlayer: AlphabetSoundPlayer
+    soundPlayer: AlphabetSoundPlayer,
+    modifier: Modifier = Modifier // Adăugat parametru modifier
 ) {
     Box(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
+        modifier = modifier // FIX: Folosim modifier-ul primit, care conține align-ul
             .fillMaxWidth()
             .height(170.dp),
         contentAlignment = Alignment.Center
@@ -389,7 +385,6 @@ private fun BottomPanel(
                         Spacer(modifier = Modifier.height(8.dp))
                         val bakeEnabled = uiState.isRecipeComplete
                         
-                        // Folosim SquishyButton definit local
                         SquishyButton(
                             onClick = {
                                 if (bakeEnabled) {
@@ -522,7 +517,7 @@ fun DraggableToolItem(
             ToolProgressRing(
                 progress = progress,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
+                    .align(Alignment.TopEnd) // Aici e OK, suntem în Box-ul DraggableToolItem
                     .size(30.dp)
             )
         }
@@ -686,8 +681,9 @@ private fun Sparkle(scale: Float, alpha: Float) {
     }
 }
 
+// FIX: Facem SparkDot extensie de BoxScope, ca să putem folosi .align()
 @Composable
-private fun SparkDot(alignment: Alignment) {
+private fun BoxScope.SparkDot(alignment: Alignment) {
     Box(
         modifier = Modifier
             .align(alignment)
@@ -720,10 +716,9 @@ private fun BiteMarksOverlay(biteMarks: List<BiteMark>) {
 }
 
 // =========================================================
-//  RESURSE LOCALE PENTRU COOKING GAME (Să nu depindă de Alphabet)
+//  RESURSE LOCALE PENTRU COOKING GAME
 // =========================================================
 
-// 1. Un buton cu animație "squishy" (copie după cel din Alphabet)
 @Composable
 fun SquishyButton(
     onClick: () -> Unit,
@@ -755,7 +750,6 @@ fun SquishyButton(
     }
 }
 
-// 2. Data class pentru particule confetti
 data class ConfettiParticle(
     val id: Int,
     var x: Float,
@@ -768,7 +762,6 @@ data class ConfettiParticle(
     var vy: Float
 )
 
-// 3. Sistemul de confetti (Canvas based)
 @Composable
 fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
     val colors = listOf(
@@ -785,10 +778,9 @@ fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
         LaunchedEffect(burstId, widthPx, heightPx) {
             particles.clear()
             if (burstId > 0L) {
-                // Generăm particule noi
                 repeat(80) { id ->
                     val startX = Random.nextFloat() * widthPx
-                    val startY = -with(density) { 40.dp.toPx() } // Pornesc de sus
+                    val startY = -with(density) { 40.dp.toPx() }
                     particles.add(
                         ConfettiParticle(
                             id = id,
@@ -804,7 +796,6 @@ fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
                     )
                 }
 
-                // Buclă de animație
                 var lastTime = withFrameNanos { it }
                 while (isActive && particles.isNotEmpty()) {
                     withFrameNanos { now ->
@@ -813,7 +804,6 @@ fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
                         val t = now / 1_000_000_000f
 
                         val newParticles = particles.map { p ->
-                            // Adăugăm o mișcare laterală (sinusoidală)
                             val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat()
                             p.apply {
                                 x += (vx + sway) * dt
@@ -831,7 +821,6 @@ fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             content()
-            // Desenăm confetti deasupra
             if (particles.isNotEmpty()) {
                 Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
                     particles.forEach { p ->
