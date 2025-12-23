@@ -28,12 +28,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.withTransform // Import esențial
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity // Import esențial
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -83,7 +84,6 @@ fun MagicGardenGameScreen(
         }
     }
 
-    // Folosim ConfettiBox local (MagicConfettiBox)
     MagicConfettiBox(burstId = confettiBurstId) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -454,8 +454,6 @@ private fun SunRays(modifier: Modifier = Modifier) {
     }
 }
 
-// --- UTILS LOCALE REDENUMITE PENTRU A EVITA CONFLICTELE ---
-
 @Composable
 private fun MagicSquishyButton(
     onClick: () -> Unit,
@@ -472,7 +470,6 @@ private fun MagicSquishyButton(
     Surface(onClick = onClick, modifier = modifier.scale(buttonScale).let { if (size != null) it.size(size) else it }, shape = shape, color = color, shadowElevation = elevation, interactionSource = interactionSource) { Box(contentAlignment = Alignment.Center, content = content) }
 }
 
-// REDENUMIT: MagicConfettiParticle
 private data class MagicConfettiParticle(
     val id: Int,
     var x: Float,
@@ -489,16 +486,18 @@ private data class MagicConfettiParticle(
 private fun MagicConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
     val colors = listOf(Color(0xFFFFC107), Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFFFF5722))
     val particles = remember { mutableStateListOf<MagicConfettiParticle>() }
-    val density = LocalDensity.current
+    val density = LocalDensity.current // Import corectat mai sus
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
+        val startY = with(density) { -40.dp.toPx() } // Calculat explicit
+        val endYLimit = heightPx + with(density) { 120.dp.toPx() }
+
         LaunchedEffect(burstId) {
             particles.clear()
             if (burstId > 0L) {
                 repeat(80) { id ->
                     val startX = Random.nextFloat() * widthPx
-                    val startY = -with(density) { 40.dp.toPx() }
                     particles.add(MagicConfettiParticle(id, startX, startY, colors.random(), Random.nextFloat() * 0.4f + 0.6f, (Random.nextFloat() - 0.5f) * 260f, Random.nextFloat() * 360f, (Random.nextFloat() - 0.5f) * 220f, 720f + (Random.nextFloat() * 320f)))
                 }
                 var lastTime = withFrameNanos { it }
@@ -506,7 +505,7 @@ private fun MagicConfettiBox(burstId: Long, modifier: Modifier = Modifier, conte
                     withFrameNanos { now ->
                         val dt = (now - lastTime) / 1_000_000_000f; lastTime = now
                         val t = now / 1_000_000_000f
-                        val newParticles = particles.map { p -> val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
+                        val newParticles = particles.map { p -> val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < endYLimit }
                         particles.clear(); particles.addAll(newParticles)
                     }
                 }

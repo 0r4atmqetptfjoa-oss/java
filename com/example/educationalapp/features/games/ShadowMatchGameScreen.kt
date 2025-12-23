@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas // Import adăugat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,7 +37,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.withTransform // Import adăugat
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
@@ -44,7 +45,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalDensity // Import adăugat
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
@@ -411,7 +412,6 @@ private fun ShadowSquishyButton(
     Surface(onClick = onClick, modifier = modifier.scale(buttonScale).let { if (size != null) it.size(size) else it }, shape = shape, color = color, shadowElevation = elevation, interactionSource = interactionSource) { Box(contentAlignment = Alignment.Center, content = content) }
 }
 
-// REDENUMIT: ShadowConfettiParticle
 private data class ShadowConfettiParticle(
     val id: Int,
     var x: Float,
@@ -432,12 +432,14 @@ private fun ShadowConfettiBox(burstId: Long, modifier: Modifier = Modifier, cont
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = with(density) { maxWidth.toPx() }
         val heightPx = with(density) { maxHeight.toPx() }
+        val startY = with(density) { -40.dp.toPx() }
+        val endYLimit = heightPx + with(density) { 120.dp.toPx() }
+
         LaunchedEffect(burstId) {
             particles.clear()
             if (burstId > 0L) {
                 repeat(80) { id ->
                     val startX = Random.nextFloat() * widthPx
-                    val startY = -with(density) { 40.dp.toPx() }
                     particles.add(ShadowConfettiParticle(id, startX, startY, colors.random(), Random.nextFloat() * 0.4f + 0.6f, (Random.nextFloat() - 0.5f) * 260f, Random.nextFloat() * 360f, (Random.nextFloat() - 0.5f) * 220f, 720f + (Random.nextFloat() * 320f)))
                 }
                 var lastTime = withFrameNanos { it }
@@ -445,7 +447,7 @@ private fun ShadowConfettiBox(burstId: Long, modifier: Modifier = Modifier, cont
                     withFrameNanos { now ->
                         val dt = (now - lastTime) / 1_000_000_000f; lastTime = now
                         val t = now / 1_000_000_000f
-                        val newParticles = particles.map { p -> val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
+                        val newParticles = particles.map { p -> val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < endYLimit }
                         particles.clear(); particles.addAll(newParticles)
                     }
                 }
