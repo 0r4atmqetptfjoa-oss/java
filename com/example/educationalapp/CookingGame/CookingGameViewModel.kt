@@ -26,9 +26,10 @@ enum class CookingStage {
 data class PlacedTopping(
     val id: String = UUID.randomUUID().toString(),
     val imageRes: Int,
-    val positionFromCenter: Offset, // Poziție relativă față de centrul pizzei (px)
+    val positionFromCenter: Offset, // Poziție relativă exactă
     val scale: Float = 1f,
-    val rotation: Float = 0f
+    val rotation: Float = 0f,
+    val timestamp: Long = System.currentTimeMillis() // Pentru animația de "landing"
 )
 
 data class IngredientOption(
@@ -43,14 +44,14 @@ data class RecipeRequirement(
 )
 
 data class BiteMark(
-    val offsetFromCenter: Offset, // px
+    val offsetFromCenter: Offset,
     val radiusPx: Float
 )
 
 data class CookingUiState(
     val stage: CookingStage = CookingStage.ROLLING,
-
-    // Rolling/Sauce "mini-game" progress (0..1)
+    
+    // Progres
     val rollProgress: Float = 0f,
     val sauceProgress: Float = 0f,
 
@@ -65,11 +66,7 @@ data class CookingUiState(
     // Eating
     val bitesTaken: Int = 0,
     val biteMarks: List<BiteMark> = emptyList(),
-    val isPizzaFinished: Boolean = false,
-
-    // Lightweight FX triggers
-    val lastDropFxId: Long = 0L,
-    val lastDropFxPosFromCenter: Offset = Offset.Zero
+    val isPizzaFinished: Boolean = false
 )
 
 @HiltViewModel
@@ -78,7 +75,6 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
     private val _uiState = MutableStateFlow(CookingUiState())
     val uiState: StateFlow<CookingUiState> = _uiState
 
-    // LISTA DE INGREDIENTE DISPONIBILE
     val availableIngredients = listOf(
         IngredientOption("salami", R.drawable.top_salami),
         IngredientOption("mushroom", R.drawable.top_mushroom),
@@ -91,10 +87,9 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
         IngredientOption("tomato", R.drawable.top_tomato)
     )
 
-    // Tuning
     private val rollTarget = 1.0f
     private val sauceTarget = 1.0f
-    private val maxToppings = 60
+    private val maxToppings = 20 // Mai multe ingrediente pentru distracție
     private val bitesToFinish = 6
 
     init {
@@ -104,17 +99,7 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
     fun resetGame() {
         _uiState.value = CookingUiState(
             stage = CookingStage.ROLLING,
-            rollProgress = 0f,
-            sauceProgress = 0f,
-            recipe = randomRecipe(),
-            placedToppings = emptyList(),
-            isRecipeComplete = false,
-            bakeProgress = 0f,
-            bitesTaken = 0,
-            biteMarks = emptyList(),
-            isPizzaFinished = false,
-            lastDropFxId = 0L,
-            lastDropFxPosFromCenter = Offset.Zero
+            recipe = randomRecipe()
         )
     }
 
@@ -143,16 +128,18 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
     }
 
     // ===== TOPPING =====
-    fun addTopping(imageRes: Int, positionFromCenter: Offset) {
+    fun addTopping(imageRes: Int, exactPosition: Offset) {
         val s = _uiState.value
         if (s.stage != CookingStage.TOPPING) return
         if (s.placedToppings.size >= maxToppings) return
 
+        // Adăugăm ingredientul exact la poziția unde a dat drumul copilul,
+        // dar adăugăm o mică variație random la rotație pentru naturalețe.
         val topping = PlacedTopping(
             imageRes = imageRes,
-            positionFromCenter = positionFromCenter,
+            positionFromCenter = exactPosition,
             rotation = Random.nextInt(0, 360).toFloat(),
-            scale = 0.8f + Random.nextFloat() * 0.45f
+            scale = 0.9f + Random.nextFloat() * 0.2f // Variație mică de mărime
         )
 
         val newList = s.placedToppings + topping
@@ -160,46 +147,45 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
 
         _uiState.value = s.copy(
             placedToppings = newList,
-            isRecipeComplete = complete,
-            lastDropFxId = System.currentTimeMillis(),
-            lastDropFxPosFromCenter = positionFromCenter
+            isRecipeComplete = complete
         )
     }
 
     fun startBaking() {
         val s = _uiState.value
         if (s.stage != CookingStage.TOPPING) return
-        if (!s.isRecipeComplete) return
-
+        // Poți coace chiar dacă rețeta nu e completă, e mai distractiv pentru copii
+        
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(stage = CookingStage.BAKING, bakeProgress = 0f)
+            _uiState.value = s.copy(stage = CookingStage.BAKING, bakeProgress = 0f)
 
-            val totalSteps = 36
+            val totalSteps = 50
             for (i in 1..totalSteps) {
-                delay(90)
+                delay(60)
                 _uiState.value = _uiState.value.copy(bakeProgress = i / totalSteps.toFloat())
             }
-
-            // Enter eating + generate bite marks gradually on taps
             _uiState.value = _uiState.value.copy(stage = CookingStage.EATING)
         }
     }
 
     // ===== EATING =====
-    fun takeBite(pizzaRadiusPx: Float) {
+    fun takeBite(pizzaRadiusPx: Float, touchPos: Offset) {
         val s = _uiState.value
         if (s.stage != CookingStage.EATING) return
         if (s.isPizzaFinished) return
 
         val currentBites = s.bitesTaken + 1
-        val newMark = generateBiteMark(pizzaRadiusPx, seed = currentBites * 997)
+        
+        // Mușcătura apare exact unde a apăsat copilul (sau aproape)
+        val biteRadius = pizzaRadiusPx * 0.25f
+        val newMark = BiteMark(offsetFromCenter = touchPos, radiusPx = biteRadius)
 
-        val newMarks = if (currentBites <= bitesToFinish) s.biteMarks + newMark else s.biteMarks
+        val newMarks = s.biteMarks + newMark
         _uiState.value = s.copy(bitesTaken = currentBites, biteMarks = newMarks)
 
         if (currentBites >= bitesToFinish) {
             viewModelScope.launch {
-                delay(450)
+                delay(300)
                 _uiState.value = _uiState.value.copy(isPizzaFinished = true)
             }
         }
@@ -207,34 +193,17 @@ class CookingGameViewModel @Inject constructor() : ViewModel() {
 
     // ===== Helpers =====
     private fun randomRecipe(): List<RecipeRequirement> {
-        // Pick 3 distinct ingredients, child-friendly counts
         val pool = availableIngredients.shuffled()
         val pick = pool.take(3)
-        val counts = listOf(2, 2, 1).shuffled() // small targets
-        return pick.mapIndexed { idx, ing ->
-            RecipeRequirement(
-                ingredientId = ing.id,
-                imageRes = ing.imageRes,
-                requiredCount = counts[idx]
-            )
+        // Numere mici pentru copii (1-2 bucăți)
+        return pick.map { ing ->
+            RecipeRequirement(ing.id, ing.imageRes, Random.nextInt(1, 3))
         }
     }
 
     private fun computeRecipeComplete(recipe: List<RecipeRequirement>, toppings: List<PlacedTopping>): Boolean {
         if (recipe.isEmpty()) return true
-        // count by imageRes (stable)
         val counts = toppings.groupingBy { it.imageRes }.eachCount()
         return recipe.all { req -> (counts[req.imageRes] ?: 0) >= req.requiredCount }
-    }
-
-    private fun generateBiteMark(pizzaRadiusPx: Float, seed: Int): BiteMark {
-        // Place bites on the rim area (upper-right-ish) with some variance.
-        val rnd = Random(seed)
-        val angle = (rnd.nextFloat() * 0.8f + 0.15f) * (Math.PI.toFloat()) // 0.15π .. 0.95π
-        val rim = pizzaRadiusPx * (0.72f + rnd.nextFloat() * 0.12f)
-        val x = (kotlin.math.cos(angle.toDouble()) * rim).toFloat()
-        val y = (kotlin.math.sin(angle.toDouble()) * rim).toFloat()
-        val r = pizzaRadiusPx * (0.15f + rnd.nextFloat() * 0.03f)
-        return BiteMark(offsetFromCenter = Offset(x, -y), radiusPx = r) // negative y => upward bias
     }
 }

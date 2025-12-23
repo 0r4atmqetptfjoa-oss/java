@@ -27,8 +27,6 @@ import com.example.educationalapp.MemoryGame.MemoryGameScreen
 import com.example.educationalapp.AnimalBandGame.AnimalBandGame
 import com.example.educationalapp.EggGame.EggGameScreen
 import com.example.educationalapp.FeedGame.FeedGameScreen
-// Asigură-te că CookingGameScreen este importat corect:
-import com.example.educationalapp.features.games.CookingGameScreen
 
 private fun backToGames(navController: NavController) {
     val popped = navController.popBackStack(Screen.GamesMenu.route, false)
@@ -89,11 +87,11 @@ fun AppNavigation(viewModel: MainViewModel) {
         }
 
         composable(Screen.GamesMenu.route) {
-             GamesMenuScreen(navController = navController)
+            GamesMenuScreen(navController = navController)
         }
 
         navigation(
-            startDestination = GameRoutes.ALPHABET_QUIZ, 
+            startDestination = GameRoutes.ALPHABET_QUIZ,
             route = GameRoutes.ALPHABET_GRAPH
         ) {
             composable(GameRoutes.ALPHABET_QUIZ) {
@@ -109,10 +107,19 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.SHAPES) { wrap(GameRoutes.SHAPES) { ShapesGameScreen(onBack = { backToGames(navController) }) }() }
         composable(GameRoutes.PUZZLE) { wrap(GameRoutes.PUZZLE) { PuzzleGameScreen(onBack = { backToGames(navController) }) }() }
 
-        // --- JOCUL DE GĂTIT (NOU) ---
+        // --- JOCUL DE GĂTIT ---
         composable(GameRoutes.COOKING) {
             wrap(GameRoutes.COOKING) {
                 CookingGameScreen(
+                    onBack = { backToGames(navController) }
+                )
+            }()
+        }
+
+        // --- NOU (2026): MAGIC GARDEN ---
+        composable(GameRoutes.MAGIC_GARDEN) {
+            wrap(GameRoutes.MAGIC_GARDEN) {
+                MagicGardenGameScreen(
                     onBack = { backToGames(navController) }
                 )
             }()
@@ -128,11 +135,20 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.INSTRUMENTS) { wrap(GameRoutes.INSTRUMENTS) { InstrumentsGameScreen(navController, starState) }() }
         composable(GameRoutes.SEQUENCE) { wrap(GameRoutes.SEQUENCE) { SequenceMemoryGameScreen(navController, starState) }() }
         composable(GameRoutes.MATH) { wrap(GameRoutes.MATH) { MathGameScreen(navController, starState) }() }
-        
+
         // Asigură-te că aceste ecrane există sau comentează-le dacă nu sunt implementate încă
         composable(GameRoutes.BLOCKS) { wrap(GameRoutes.BLOCKS) { com.example.educationalapp.BlocksGameScreen(navController, starState) }() }
         composable(GameRoutes.MAZE) { wrap(GameRoutes.MAZE) { com.example.educationalapp.MazeGameScreen(navController, starState) }() }
-        composable(GameRoutes.SHADOW_MATCH) { wrap(GameRoutes.SHADOW_MATCH) { com.example.educationalapp.ShadowMatchGameScreen(navController, starState) }() }
+
+        // --- Shadow Match (upgradat 2026) ---
+        composable(GameRoutes.SHADOW_MATCH) {
+            wrap(GameRoutes.SHADOW_MATCH) {
+                ShadowMatchGameScreen(
+                    onBack = { backToGames(navController) }
+                )
+            }()
+        }
+
         composable(GameRoutes.ANIMAL_SORTING) { wrap(GameRoutes.ANIMAL_SORTING) { com.example.educationalapp.AnimalSortingGameScreen(navController, starState) }() }
         composable(GameRoutes.CODING) { wrap(GameRoutes.CODING) { com.example.educationalapp.features.games.CodingGameScreen(navController, starState) }() }
 

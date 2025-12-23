@@ -17,21 +17,25 @@ object GameRoutes {
     const val PUZZLE = "puzzle"               // Era "game_puzzle"
     const val MEMORY = "memory_game"          // Era "game_memory"
     const val ANIMAL_SORTING = "animal_sorting_game"
-    
+
     // FIXAT: Acum coincide cu Screen.CookingGame.route ("cooking_game")
-    const val COOKING = "cooking_game"        
-    
+    const val COOKING = "cooking_game"
+
     const val INSTRUMENTS = "instruments_game"
     const val BLOCKS = "blocks_game"
     const val MAZE = "maze_game"
     const val HIDDEN_OBJECTS = "hidden_objects_game"
     const val SORTING = "sorting_game"
     const val SHADOW_MATCH = "shadow_match_game"
+
+    // NOU (2026): Magic Garden
+    const val MAGIC_GARDEN = "magic_garden_game"
+
     const val CODING = "coding_game"
     const val SEQUENCE = "sequence_memory_game"
 
     // Jocuri Extra / Noi (acestea nu par să fie în Screen.kt, deci le lăsăm așa)
-    const val PEEKABOO = "game_peekaboo" 
+    const val PEEKABOO = "game_peekaboo"
     const val EGG_SURPRISE = "game_egg_surprise"
     const val FEED_MONSTER = "game_feed_monster"
     const val ANIMAL_BAND = "game_animal_band"

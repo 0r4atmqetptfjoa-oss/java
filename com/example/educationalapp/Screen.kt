@@ -34,10 +34,14 @@ sealed class Screen(val route: String) {
     object InstrumentsGame : Screen("instruments_game")
     object BlocksGame : Screen("blocks_game")
     object MazeGame : Screen("maze_game")
+
     // Newly added games
     object HiddenObjectsGame : Screen("hidden_objects_game")
     object SortingGame : Screen("sorting_game")
     object ShadowMatchGame : Screen("shadow_match_game")
+
+    // NOU (2026)
+    object MagicGardenGame : Screen("magic_garden_game")
 
     // New educational coding game: guide a robot through a maze using command sequences
     object CodingGame : Screen("coding_game")

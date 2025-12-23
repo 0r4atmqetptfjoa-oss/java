@@ -50,7 +50,11 @@ fun GamesMenuScreen(navController: NavController) {
             Game("Gătit", R.drawable.main_menu_icon_jocuri, Screen.CookingGame.route),
             Game("Labirint", R.drawable.main_menu_icon_jocuri, Screen.MazeGame.route),
             Game("Ascunse", R.drawable.icon_game_hiddenobjects, Screen.HiddenObjectsGame.route),
+
+            // NOI (2026)
+            Game("Grădină Magică", R.drawable.main_menu_icon_jocuri, Screen.MagicGardenGame.route),
             Game("Umbre", R.drawable.main_menu_icon_jocuri, Screen.ShadowMatchGame.route),
+
             Game("Animale", R.drawable.icon_game_animals, Screen.AnimalSortingGame.route),
             Game("Instrumente", R.drawable.icon_game_instruments, Screen.InstrumentsGame.route),
             Game("Codare", R.drawable.main_menu_icon_jocuri, Screen.CodingGame.route)
