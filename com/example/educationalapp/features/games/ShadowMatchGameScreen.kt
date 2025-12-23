@@ -1,25 +1,17 @@
 package com.example.educationalapp.features.games
 
 import android.view.SoundEffectConstants
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,40 +25,40 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.graphicsLayer
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer // Corectat
 import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
 import com.example.educationalapp.alphabet.AlphabetSoundPlayer
-import com.example.educationalapp.alphabet.ConfettiBox
-import com.example.educationalapp.alphabet.SquishyButton
+import kotlinx.coroutines.isActive
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.random.Random
 
 @Composable
 fun ShadowMatchGameScreen(
@@ -77,7 +69,8 @@ fun ShadowMatchGameScreen(
 
     val density = LocalDensity.current
     val view = LocalView.current
-    val sound = remember { AlphabetSoundPlayer() }
+    val context = LocalContext.current // Adăugat context
+    val sound = remember { AlphabetSoundPlayer(context) } // Pasat context
 
     // Drop zones (centru in coordonate root)
     val dropZones = remember { mutableStateMapOf<Int, Offset>() }
@@ -125,13 +118,18 @@ fun ShadowMatchGameScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             SquishyButton(
-                imageRes = R.drawable.ui_button_home,
-                size = 56.dp,
                 onClick = {
                     sound.playClick()
                     onBack()
-                }
-            )
+                },
+                size = 56.dp
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ui_button_home),
+                    contentDescription = "Home",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
@@ -263,19 +261,25 @@ fun ShadowMatchGameScreen(
 
                 // reset
                 SquishyButton(
-                    imageRes = R.drawable.ui_button_refresh,
-                    size = 56.dp,
                     onClick = {
                         sound.playClick()
                         viewModel.resetGame()
-                    }
-                )
+                    },
+                    size = 56.dp
+                ) {
+                    // Înlocuit resursa lipsă cu iconița home ca fallback
+                    Image(
+                        painter = painterResource(id = R.drawable.ui_button_home),
+                        contentDescription = "Reset",
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
         }
 
         // Confetti overlay la final
         if (uiState.isLevelComplete) {
-            ConfettiBox(modifier = Modifier.fillMaxSize())
+            ConfettiBox(burstId = System.currentTimeMillis())
         }
     }
 }
@@ -464,3 +468,119 @@ private fun colorFor(kind: ShadowKind) = when (kind) {
 }
 
 private operator fun Offset.plus(other: Offset) = Offset(x + other.x, y + other.y)
+
+// --- LOCAL COPIES OF UTILS TO ENSURE COMPILATION ---
+
+@Composable
+private fun SquishyButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp? = null,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(16.dp),
+    color: Color = Color.White,
+    elevation: Dp = 4.dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.86f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "btnScale"
+    )
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .scale(buttonScale)
+            .let { if (size != null) it.size(size) else it },
+        shape = shape,
+        color = color,
+        shadowElevation = elevation,
+        interactionSource = interactionSource
+    ) {
+        Box(contentAlignment = Alignment.Center, content = content)
+    }
+}
+
+data class ConfettiParticle(
+    val id: Int,
+    var x: Float,
+    var y: Float,
+    val color: Color,
+    val scale: Float,
+    val rotationSpeed: Float,
+    var currentRotation: Float,
+    var vx: Float,
+    var vy: Float
+)
+
+@Composable
+private fun ConfettiBox(burstId: Long, modifier: Modifier = Modifier, content: @Composable () -> Unit = {}) {
+    val colors = listOf(Color(0xFFFFC107), Color(0xFF4CAF50), Color(0xFF2196F3), Color(0xFFE91E63), Color(0xFFFF5722))
+    val particles = remember { mutableStateListOf<ConfettiParticle>() }
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
+        LaunchedEffect(burstId) {
+            particles.clear()
+            if (burstId > 0L) {
+                repeat(80) { id ->
+                    val startX = Random.nextFloat() * widthPx
+                    val startY = -with(density) { 40.dp.toPx() }
+                    particles.add(
+                        ConfettiParticle(
+                            id = id,
+                            x = startX,
+                            y = startY,
+                            color = colors.random(),
+                            scale = Random.nextFloat() * 0.4f + 0.6f,
+                            rotationSpeed = (Random.nextFloat() - 0.5f) * 260f,
+                            currentRotation = Random.nextFloat() * 360f,
+                            vx = (Random.nextFloat() - 0.5f) * 220f,
+                            vy = 720f + (Random.nextFloat() * 320f)
+                        )
+                    )
+                }
+                var lastTime = withFrameNanos { it }
+                while (isActive && particles.isNotEmpty()) {
+                    withFrameNanos { now ->
+                        val dt = (now - lastTime) / 1_000_000_000f
+                        lastTime = now
+                        val t = now / 1_000_000_000f
+                        val newParticles = particles.map { p ->
+                            val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat()
+                            p.apply {
+                                x += (vx + sway) * dt
+                                y += vy * dt
+                                currentRotation += rotationSpeed * dt
+                            }
+                        }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
+                        particles.clear()
+                        particles.addAll(newParticles)
+                    }
+                }
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            content()
+            if (particles.isNotEmpty()) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
+                    particles.forEach { p ->
+                        withTransform({
+                            translate(p.x, p.y)
+                            rotate(p.currentRotation)
+                            scale(p.scale, p.scale)
+                        }) {
+                            drawRect(
+                                color = p.color,
+                                topLeft = Offset(-12f, -8f),
+                                size = Size(24f, 16f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
