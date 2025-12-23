@@ -1,15 +1,17 @@
 package com.example.educationalapp.features.games
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,8 +29,9 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -37,18 +40,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
-// IMPORTANT: Asigură-te că aceste fișiere există în pachetul 'alphabet'
 import com.example.educationalapp.alphabet.AlphabetSoundPlayer
-import com.example.educationalapp.alphabet.ConfettiBox
-import com.example.educationalapp.alphabet.SquishyButton
+// NOTĂ: Am eliminat importurile către alphabet.ConfettiBox și SquishyButton
+// Le-am definit local la finalul fișierului.
+
+import kotlinx.coroutines.isActive
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.random.Random
 
 // ===== Fallback resource mapping =====
 private const val BG_PIZZERIA_KITCHEN: Int = R.drawable.bg_game_colors
@@ -69,6 +76,8 @@ fun CookingGameScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    // Putem folosi sunetele din Alphabet sau un SoundPlayer generic. 
+    // Deocamdată păstrăm AlphabetSoundPlayer dacă e accesibil (el e public de obicei).
     val soundPlayer = remember { AlphabetSoundPlayer(context) }
 
     // Confetti final
@@ -102,6 +111,7 @@ fun CookingGameScreen(
     val density = LocalDensity.current
     val toppingSizePx = with(density) { 46.dp.toPx() }
 
+    // Folosim ConfettiBox definit local la finalul fișierului
     ConfettiBox(burstId = confettiBurstId) {
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -115,7 +125,6 @@ fun CookingGameScreen(
 
             // Back button
             Image(
-                // FIX: Aici era "ui_button_home"
                 painter = painterResource(id = R.drawable.ui_btn_home),
                 contentDescription = "Back",
                 modifier = Modifier
@@ -235,9 +244,6 @@ fun CookingGameScreen(
     }
 }
 
-// ... Restul funcțiilor (StageStepper, BakingPanel, etc.) rămân la fel ca în fișierul tău anterior ...
-// Asigură-te că păstrezi tot codul de sub "fun CookingGameScreen" din versiunea anterioară!
-// (Le-am omis aici pentru a economisi spațiu, dar ele sunt necesare).
 @Composable
 private fun StageStepper(stage: CookingStage, modifier: Modifier = Modifier) {
     val items = listOf(
@@ -382,6 +388,8 @@ private fun BottomPanel(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         val bakeEnabled = uiState.isRecipeComplete
+                        
+                        // Folosim SquishyButton definit local
                         SquishyButton(
                             onClick = {
                                 if (bakeEnabled) {
@@ -496,7 +504,6 @@ fun DraggableToolItem(
                             val dist = (currentPos - targetCenter).getDistance()
                             if (dist < targetRadius) {
                                 val len = hypot(dragAmount.x, dragAmount.y)
-                                // Tune: progress gained per drag distance while "on pizza"
                                 val delta = (len / (targetRadius * 14f)).coerceIn(0f, 0.08f)
                                 onDragProgress(delta)
                             }
@@ -511,7 +518,6 @@ fun DraggableToolItem(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Progress ring
         if (progress in 0f..0.99f) {
             ToolProgressRing(
                 progress = progress,
@@ -594,7 +600,6 @@ fun DraggableIngredientItem(
     }
 }
 
-
 @Composable
 private fun ToolProgressRing(progress: Float, modifier: Modifier = Modifier) {
     Box(
@@ -664,7 +669,6 @@ private fun DropSparkleFx(
 
 @Composable
 private fun Sparkle(scale: Float, alpha: Float) {
-    // Simple "sparkle": 4 dots
     val density = LocalDensity.current
     val halfPx = with(density) { 40.dp.toPx().roundToInt() }
 
@@ -681,6 +685,7 @@ private fun Sparkle(scale: Float, alpha: Float) {
         SparkDot(Alignment.CenterEnd)
     }
 }
+
 @Composable
 private fun SparkDot(alignment: Alignment) {
     Box(
@@ -694,7 +699,6 @@ private fun SparkDot(alignment: Alignment) {
 
 @Composable
 private fun BiteMarksOverlay(biteMarks: List<BiteMark>) {
-    // Draw bite marks as light circles (visual hint). Safe across Compose versions.
     Box(modifier = Modifier.fillMaxSize()) {
         androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
             val c = center
@@ -710,6 +714,140 @@ private fun BiteMarksOverlay(biteMarks: List<BiteMark>) {
                     center = c + mark.offsetFromCenter,
                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = mark.radiusPx * 0.08f)
                 )
+            }
+        }
+    }
+}
+
+// =========================================================
+//  RESURSE LOCALE PENTRU COOKING GAME (Să nu depindă de Alphabet)
+// =========================================================
+
+// 1. Un buton cu animație "squishy" (copie după cel din Alphabet)
+@Composable
+fun SquishyButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp? = null,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(16.dp),
+    color: Color = Color.White,
+    elevation: Dp = 4.dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.86f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "btnScale"
+    )
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .scale(buttonScale)
+            .let { if (size != null) it.size(size) else it },
+        shape = shape,
+        color = color,
+        shadowElevation = elevation,
+        interactionSource = interactionSource
+    ) {
+        Box(contentAlignment = Alignment.Center, content = content)
+    }
+}
+
+// 2. Data class pentru particule confetti
+data class ConfettiParticle(
+    val id: Int,
+    var x: Float,
+    var y: Float,
+    val color: Color,
+    val scale: Float,
+    val rotationSpeed: Float,
+    var currentRotation: Float,
+    var vx: Float,
+    var vy: Float
+)
+
+// 3. Sistemul de confetti (Canvas based)
+@Composable
+fun ConfettiBox(burstId: Long, content: @Composable () -> Unit) {
+    val colors = listOf(
+        Color(0xFFFFC107), Color(0xFF4CAF50), Color(0xFF2196F3),
+        Color(0xFFE91E63), Color(0xFFFF5722)
+    )
+    val particles = remember { mutableStateListOf<ConfettiParticle>() }
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val widthPx = with(density) { maxWidth.toPx() }
+        val heightPx = with(density) { maxHeight.toPx() }
+
+        LaunchedEffect(burstId, widthPx, heightPx) {
+            particles.clear()
+            if (burstId > 0L) {
+                // Generăm particule noi
+                repeat(80) { id ->
+                    val startX = Random.nextFloat() * widthPx
+                    val startY = -with(density) { 40.dp.toPx() } // Pornesc de sus
+                    particles.add(
+                        ConfettiParticle(
+                            id = id,
+                            x = startX,
+                            y = startY,
+                            color = colors.random(),
+                            scale = Random.nextFloat() * 0.4f + 0.6f,
+                            rotationSpeed = (Random.nextFloat() - 0.5f) * 260f,
+                            currentRotation = Random.nextFloat() * 360f,
+                            vx = (Random.nextFloat() - 0.5f) * 220f,
+                            vy = 720f + (Random.nextFloat() * 320f)
+                        )
+                    )
+                }
+
+                // Buclă de animație
+                var lastTime = withFrameNanos { it }
+                while (isActive && particles.isNotEmpty()) {
+                    withFrameNanos { now ->
+                        val dt = (now - lastTime) / 1_000_000_000f
+                        lastTime = now
+                        val t = now / 1_000_000_000f
+
+                        val newParticles = particles.map { p ->
+                            // Adăugăm o mișcare laterală (sinusoidală)
+                            val sway = (sin((t * 4.8f + p.id).toDouble()) * 28.0).toFloat()
+                            p.apply {
+                                x += (vx + sway) * dt
+                                y += vy * dt
+                                currentRotation += rotationSpeed * dt
+                            }
+                        }.filter { it.y < heightPx + with(density) { 120.dp.toPx() } }
+
+                        particles.clear()
+                        particles.addAll(newParticles)
+                    }
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            content()
+            // Desenăm confetti deasupra
+            if (particles.isNotEmpty()) {
+                Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
+                    particles.forEach { p ->
+                        withTransform({
+                            translate(p.x, p.y)
+                            rotate(p.currentRotation)
+                            scale(p.scale, p.scale)
+                        }) {
+                            drawRect(
+                                color = p.color,
+                                topLeft = Offset(-12f, -8f),
+                                size = Size(24f, 16f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
