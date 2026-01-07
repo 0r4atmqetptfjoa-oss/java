@@ -50,7 +50,7 @@ import kotlin.random.Random
 @Composable
 fun MagicGardenGameScreen(
     viewModel: MagicGardenViewModel = hiltViewModel(),
-    hasFullVersion: Boolean = false, // FIX: Adăugat pentru a potrivi apelul din AppNavigation
+    hasFullVersion: Boolean = false, // FIX: Adăugat cu valoare default pentru a preveni erorile
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -62,10 +62,6 @@ fun MagicGardenGameScreen(
     var gardenCenter by remember { mutableStateOf(Offset.Zero) }
     val sparkles = remember { mutableStateListOf<Sparkle>() }
 
-    // ... Restul codului rămâne identic ...
-    // Doar copiază restul conținutului din fișierul original, nu s-a schimbat nimic altceva.
-    // Pentru a nu depăși limita de caractere, nu repet tot codul, dar asigură-te că funcția începe exact ca mai sus.
-    
     fun spawnSparkle(at: Offset) {
         val s = Sparkle(id = System.currentTimeMillis() + sparkles.size, pos = at)
         sparkles.add(s)
@@ -203,45 +199,29 @@ fun MagicGardenGameScreen(
     }
 }
 
+// ... CLASELE AJUTĂTOARE (Le păstrăm pentru a nu pierde funcționalitatea) ...
 private data class Sparkle(val id: Long, val pos: Offset)
 
 @Composable
-private fun GardenPatch(
-    stage: GardenStage,
-    plantRes: Int,
-    progress: Float,
-    isCelebrating: Boolean,
-    sparkles: List<Sparkle>,
-    modifier: Modifier = Modifier
-) {
+private fun GardenPatch(stage: GardenStage, plantRes: Int, progress: Float, isCelebrating: Boolean, sparkles: List<Sparkle>, modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         val dirtRes = when (stage) {
             GardenStage.DIRT -> R.drawable.prop_dirt_flat
             GardenStage.DUG -> R.drawable.prop_dirt_hole
             else -> R.drawable.prop_dirt_flat
         }
-        
         Image(painter = painterResource(id = dirtRes), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-
         when (stage) {
-            GardenStage.DIRT -> {} 
-            GardenStage.DUG -> {} 
-            GardenStage.SEEDED -> {} 
-            GardenStage.SPROUT -> {
-                Image(painter = painterResource(id = R.drawable.prop_plant_sprout), contentDescription = "Sprout", modifier = Modifier.size(130.dp).offset(y = (-10).dp))
-            }
+            GardenStage.SPROUT -> Image(painter = painterResource(id = R.drawable.prop_plant_sprout), contentDescription = "Sprout", modifier = Modifier.size(130.dp).offset(y = (-10).dp))
             GardenStage.GROWN -> {
                 val scale by animateFloatAsState(if (isCelebrating) 1.25f else 1.15f, spring(dampingRatio = 0.55f), label = "plantScale")
                 Image(painter = painterResource(id = plantRes), contentDescription = "Plant", modifier = Modifier.size(260.dp).scale(scale).offset(y = (-20).dp))
             }
+            else -> {}
         }
-
         if (stage == GardenStage.DIRT || stage == GardenStage.DUG || stage == GardenStage.SEEDED) {
             val label = when (stage) {
-                GardenStage.DIRT -> "SAPĂ"
-                GardenStage.DUG -> "SEMINȚE"
-                GardenStage.SEEDED -> "APĂ"
-                else -> ""
+                GardenStage.DIRT -> "SAPĂ"; GardenStage.DUG -> "SEMINȚE"; GardenStage.SEEDED -> "APĂ"; else -> ""
             }
             ProgressRing(progress = progress, label = label)
         }
@@ -266,11 +246,8 @@ private fun SparkleLayer(sparkles: List<Sparkle>) {
     if (sparkles.isEmpty()) return
     Canvas(modifier = Modifier.fillMaxSize()) {
         for (s in sparkles) {
-            val p = s.pos
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val x = cx + (p.x * 0.08f)
-            val y = cy + (p.y * 0.08f)
+            val x = size.width / 2f + s.pos.x * 0.08f
+            val y = size.height / 2f + s.pos.y * 0.08f
             drawCircle(Color.Yellow, radius = 6f, center = Offset(x, y))
         }
     }
@@ -278,8 +255,7 @@ private fun SparkleLayer(sparkles: List<Sparkle>) {
 
 @Composable
 private fun ToolShelf(currentTool: ToolType?, modifier: Modifier = Modifier) {
-    val alphaInactive = 0.4f
-    val alphaActive = 1f
+    val alphaInactive = 0.4f; val alphaActive = 1f
     Row(modifier = modifier.fillMaxWidth().padding(horizontal = 18.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
         ToolIcon(R.drawable.tool_shovel, "Sapă", currentTool == ToolType.SHOVEL, alphaInactive, alphaActive)
         Spacer(Modifier.width(22.dp))
@@ -307,33 +283,20 @@ private fun DraggableTool2026(toolType: ToolType, imageRes: Int, patchCenter: Of
     val rotation by animateFloatAsState(if (isDragging) -15f else 0f, tween(160), label = "rot")
     val scale by animateFloatAsState(if (isDragging) 1.2f else 1f, spring(dampingRatio = 0.65f), label = "scale")
 
-    Box(
-        modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.BottomCenter).padding(bottom = 88.dp)
-            .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
-            .size(120.dp).zIndex(if (isDragging) 20f else 6f)
-            .onGloballyPositioned { if (initialCenter == Offset.Zero) { val pos = it.positionInRoot(); initialCenter = Offset(pos.x + it.size.width / 2f, pos.y + it.size.height / 2f) } }
-            .pointerInput(toolType, stage) {
-                detectDragGestures(
-                    onDragStart = { isDragging = true },
-                    onDragEnd = { isDragging = false; offsetX = 0f; offsetY = 0f },
-                    onDragCancel = { isDragging = false; offsetX = 0f; offsetY = 0f },
-                    onDrag = { _, dragAmount ->
-                        offsetX += dragAmount.x; offsetY += dragAmount.y
-                        if (patchCenter != Offset.Zero && initialCenter != Offset.Zero) {
-                            val cur = initialCenter + Offset(offsetX, offsetY)
-                            // FIX: Folosim getDistance() pentru claritate si siguranta
-                            val dist = (cur - patchCenter).getDistance()
-                            
-                            if (dist < 200f) {
-                                val intensity = (abs(dragAmount.x) + abs(dragAmount.y)).coerceIn(1f, 40f)
-                                onWorkTick(intensity)
-                                if (intensity > 20f) onMilestone(cur - patchCenter)
-                            }
-                        }
-                    }
-                )
+    Box(modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.BottomCenter).padding(bottom = 88.dp).offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }.size(120.dp).zIndex(if (isDragging) 20f else 6f).onGloballyPositioned { if (initialCenter == Offset.Zero) { val pos = it.positionInRoot(); initialCenter = Offset(pos.x + it.size.width / 2f, pos.y + it.size.height / 2f) } }.pointerInput(toolType, stage) {
+        detectDragGestures(onDragStart = { isDragging = true }, onDragEnd = { isDragging = false; offsetX = 0f; offsetY = 0f }, onDragCancel = { isDragging = false; offsetX = 0f; offsetY = 0f }) { _, dragAmount ->
+            offsetX += dragAmount.x; offsetY += dragAmount.y
+            if (patchCenter != Offset.Zero && initialCenter != Offset.Zero) {
+                val cur = initialCenter + Offset(offsetX, offsetY)
+                val dist = (cur - patchCenter).getDistance()
+                if (dist < 200f) {
+                    val intensity = (abs(dragAmount.x) + abs(dragAmount.y)).coerceIn(1f, 40f)
+                    onWorkTick(intensity)
+                    if (intensity > 20f) onMilestone(cur - patchCenter)
+                }
             }
-    ) {
+        }
+    }) {
         Image(painter = painterResource(id = imageRes), contentDescription = null, modifier = Modifier.fillMaxSize().scale(scale).rotate(rotation))
     }
 }
@@ -343,12 +306,9 @@ private fun DraggableCloud(isEnabled: Boolean, isMovedAway: Boolean, onMovedAway
     var offsetX by remember { mutableStateOf(0f) }
     val animatedOffsetX by animateFloatAsState(if (isMovedAway) -450f else offsetX, tween(900), label = "cloudX")
     if (isMovedAway && animatedOffsetX <= -400f) return
-
-    Box(modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.TopCenter).padding(top = 56.dp).offset { IntOffset(animatedOffsetX.roundToInt(), 0) }.size(180.dp).zIndex(5f)
-        .pointerInput(isEnabled) {
-            if (isEnabled) detectDragGestures(onDragEnd = { if (offsetX < -100f) onMovedAway() else offsetX = 0f }, onDragCancel = { offsetX = 0f }, onDrag = { _, dragAmount -> val newX = offsetX + dragAmount.x; if (newX <= 0f) offsetX = newX })
-        }
-    ) {
+    Box(modifier = Modifier.fillMaxSize().wrapContentSize(Alignment.TopCenter).padding(top = 56.dp).offset { IntOffset(animatedOffsetX.roundToInt(), 0) }.size(180.dp).zIndex(5f).pointerInput(isEnabled) {
+        if (isEnabled) detectDragGestures(onDragEnd = { if (offsetX < -100f) onMovedAway() else offsetX = 0f }, onDragCancel = { offsetX = 0f }) { _, dragAmount -> val newX = offsetX + dragAmount.x; if (newX <= 0f) offsetX = newX }
+    }) {
         Image(painter = painterResource(id = R.drawable.char_cloud_happy), contentDescription = "Cloud", modifier = Modifier.fillMaxSize())
         if (isEnabled && offsetX == 0f) Text("⬅", fontSize = 36.sp, color = Color.White, modifier = Modifier.align(Alignment.CenterStart).offset(x = (-30).dp))
     }
@@ -361,8 +321,7 @@ private fun SunRays(modifier: Modifier = Modifier) {
         val cx = size.width / 2f; val cy = size.height / 2f
         val r1 = size.minDimension * 0.22f; val r2 = size.minDimension * 0.48f
         for (i in 0 until 12) {
-            val a = Math.toRadians((i * 30).toDouble())
-            drawLine(Color.White.copy(alpha = 0.5f), Offset(cx + cos(a).toFloat() * r1, cy + sin(a).toFloat() * r1), Offset(cx + cos(a).toFloat() * r2, cy + sin(a).toFloat() * r2), 7f)
+            val a = Math.toRadians((i * 30).toDouble()); drawLine(Color.White.copy(alpha = 0.5f), Offset(cx + cos(a).toFloat() * r1, cy + sin(a).toFloat() * r1), Offset(cx + cos(a).toFloat() * r2, cy + sin(a).toFloat() * r2), 7f)
         }
     }
 }
@@ -395,7 +354,6 @@ private fun MagicConfettiBox(burstId: Long, modifier: Modifier = Modifier, conte
                 while (isActive && particles.isNotEmpty()) {
                     withFrameNanos { now ->
                         val dt = (now - lastTime) / 1_000_000_000f; lastTime = now
-                        val t = now / 1_000_000_000f
                         val newParticles = particles.map { p -> val sway = (sin((now / 1e9 * 4.8 + p.id).toDouble()) * 28.0).toFloat(); p.apply { x += (vx + sway) * dt; y += vy * dt; currentRotation += rotationSpeed * dt } }.filter { it.y < endYLimit }
                         particles.clear(); particles.addAll(newParticles)
                     }
@@ -403,12 +361,7 @@ private fun MagicConfettiBox(burstId: Long, modifier: Modifier = Modifier, conte
             }
         }
         Box(modifier = Modifier.fillMaxSize()) {
-            content()
-            if (particles.isNotEmpty()) {
-                Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) {
-                    particles.forEach { p -> withTransform({ translate(p.x, p.y); rotate(p.currentRotation); scale(p.scale, p.scale) }) { drawRect(p.color, Offset(-12f, -8f), Size(24f, 16f)) } }
-                }
-            }
+            content(); if (particles.isNotEmpty()) { Canvas(modifier = Modifier.fillMaxSize().zIndex(999f)) { particles.forEach { p -> withTransform({ translate(p.x, p.y); rotate(p.currentRotation); scale(p.scale, p.scale) }) { drawRect(p.color, Offset(-12f, -8f), Size(24f, 16f)) } } } }
         }
     }
 }
