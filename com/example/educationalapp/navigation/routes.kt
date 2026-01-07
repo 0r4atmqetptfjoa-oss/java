@@ -3,8 +3,8 @@ package com.example.educationalapp.navigation
 import kotlinx.serialization.Serializable
 
 /**
- * Definește toate rutele aplicației folosind Type-Safe Navigation.
- * Adio String-uri, bun venit Obiecte!
+ * Definește toate rutele aplicației folosind Type-Safe Navigation (Modern 2026).
+ * Înlocuiește vechiul fișier Screen.kt și GameRoutes.kt.
  */
 
 // --- Ecrane Principale ---
@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 @Serializable object GamesMenuRoute
 @Serializable object SettingsRoute
 @Serializable object PaywallRoute
+@Serializable object ParentalGateRoute
 
 // --- Meniuri Secundare ---
 @Serializable object InstrumentsMenuRoute
@@ -26,13 +27,13 @@ import kotlinx.serialization.Serializable
 @Serializable object BirdSoundsRoute
 @Serializable object VehicleSoundsRoute
 
-// --- Rute pentru Cântece Individuale (putem transmite și parametri dacă vrei pe viitor) ---
+// --- Rute pentru Cântece ---
 @Serializable object Song1Route
 @Serializable object Song2Route
 @Serializable object Song3Route
 @Serializable object Song4Route
 
-// --- JOCURI (Toate jocurile tale minunate) ---
+// --- JOCURI ---
 @Serializable object AlphabetQuizRoute
 @Serializable object PeekABooRoute
 @Serializable object ColorsRoute
@@ -56,5 +57,5 @@ import kotlinx.serialization.Serializable
 @Serializable object EggSurpriseRoute
 @Serializable object FeedMonsterRoute
 
-// --- Graf-uri de Navigare (pentru grupuri de ecrane) ---
+// --- Graf-uri (Grupuri de navigație) ---
 @Serializable object AlphabetGraphRoute

@@ -24,45 +24,42 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.example.educationalapp.R
-import com.example.educationalapp.Screen
+import com.example.educationalapp.navigation.*
 
 /**
- * Represents a simple data model for games displayed in the games menu. Each entry
- * has a user‑friendly name, an icon, and a navigation route defined in [Screen].
+ * Data model actualizat: 'route' este Any (obiectul rutei), nu String.
  */
-data class Game(val name: String, val icon: Int, val route: String)
+data class Game(val name: String, val icon: Int, val route: Any)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GamesMenuScreen(navController: NavController) {
-    // Define the list of games to show in the menu.
     val games = remember {
         listOf(
-            Game("Culori", R.drawable.icon_game_colors, Screen.ColorMatch.route),
-            Game("Forme", R.drawable.icon_game_shapes, Screen.ShapeMatch.route),
-            Game("Alfabet", R.drawable.icon_game_alphabet, Screen.AlphabetQuiz.route),
-            Game("Numere", R.drawable.icon_game_math, Screen.MathGame.route),
-            Game("Sortare", R.drawable.icon_game_sorting, Screen.SortingGame.route),
-            Game("Puzzle", R.drawable.icon_game_puzzle, Screen.Puzzle.route),
-            Game("Memorie", R.drawable.icon_game_memory, Screen.MemoryGame.route),
-            Game("Secvențe", R.drawable.icon_game_sequence, Screen.SequenceMemoryGame.route),
-            Game("Blocuri", R.drawable.main_menu_icon_jocuri, Screen.BlocksGame.route),
-            Game("Gătit", R.drawable.main_menu_icon_jocuri, Screen.CookingGame.route),
-            Game("Labirint", R.drawable.main_menu_icon_jocuri, Screen.MazeGame.route),
-            Game("Ascunse", R.drawable.icon_game_hiddenobjects, Screen.HiddenObjectsGame.route),
+            Game("Culori", R.drawable.icon_game_colors, ColorsRoute),
+            Game("Forme", R.drawable.icon_game_shapes, ShapesRoute),
+            Game("Alfabet", R.drawable.icon_game_alphabet, AlphabetQuizRoute),
+            Game("Numere", R.drawable.icon_game_math, MathRoute),
+            Game("Sortare", R.drawable.icon_game_sorting, SortingRoute),
+            Game("Puzzle", R.drawable.icon_game_puzzle, PuzzleRoute),
+            Game("Memorie", R.drawable.icon_game_memory, MemoryRoute),
+            Game("Secvențe", R.drawable.icon_game_sequence, SequenceRoute),
+            Game("Blocuri", R.drawable.main_menu_icon_jocuri, BlocksRoute),
+            Game("Gătit", R.drawable.main_menu_icon_jocuri, CookingRoute),
+            Game("Labirint", R.drawable.main_menu_icon_jocuri, MazeRoute),
+            Game("Ascunse", R.drawable.icon_game_hiddenobjects, HiddenObjectsRoute),
 
             // NOI (2026)
-            Game("Grădină Magică", R.drawable.main_menu_icon_jocuri, Screen.MagicGardenGame.route),
-            Game("Umbre", R.drawable.main_menu_icon_jocuri, Screen.ShadowMatchGame.route),
+            Game("Grădină Magică", R.drawable.main_menu_icon_jocuri, MagicGardenRoute),
+            Game("Umbre", R.drawable.main_menu_icon_jocuri, ShadowMatchRoute),
 
-            Game("Animale", R.drawable.icon_game_animals, Screen.AnimalSortingGame.route),
-            Game("Instrumente", R.drawable.icon_game_instruments, Screen.InstrumentsGame.route),
-            Game("Codare", R.drawable.main_menu_icon_jocuri, Screen.CodingGame.route)
+            Game("Animale", R.drawable.icon_game_animals, AnimalSortingRoute),
+            Game("Instrumente", R.drawable.icon_game_instruments, InstrumentsGameRoute),
+            Game("Codare", R.drawable.main_menu_icon_jocuri, CodingRoute)
         )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Background image for the games menu
         Image(
             painter = painterResource(id = R.drawable.bg_category_games),
             contentDescription = null,
@@ -109,9 +106,7 @@ fun GamesMenuScreen(navController: NavController) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            if (game.route.isNotEmpty()) {
-                                navController.navigate(game.route)
-                            }
+                            navController.navigate(game.route)
                         }
                     ) {
                         Image(

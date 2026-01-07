@@ -31,12 +31,13 @@ import androidx.constraintlayout.compose.Dimension
 import androidx.navigation.NavController
 import com.example.educationalapp.ParallaxMainMenuBackground
 import com.example.educationalapp.R
-import com.example.educationalapp.Screen
 import com.example.educationalapp.SnowfallEffect
 import com.example.educationalapp.ui.theme.KidFontFamily
+import com.example.educationalapp.navigation.*
 
+// Am schimbat 'route' din String în Any pentru a accepta Obiecte
 data class MainMenuModule(
-    val route: String,
+    val route: Any,
     @DrawableRes val iconRes: Int,
     val title: String,
 )
@@ -46,12 +47,13 @@ fun MainMenuScreen(
     navController: NavController,
     starCount: Int,
 ) {
+    // Folosim obiectele din Routes.kt
     val modules = listOf(
-        MainMenuModule("games", R.drawable.main_menu_icon_jocuri, stringResource(id = R.string.main_menu_button_games)),
-        MainMenuModule(Screen.InstrumentsMenu.route, R.drawable.main_menu_icon_instrumente, stringResource(id = R.string.main_menu_button_instruments)),
-        MainMenuModule(Screen.SongsMenu.route, R.drawable.main_menu_icone_cantece, stringResource(id = R.string.main_menu_button_songs)),
-        MainMenuModule(Screen.SoundsMenu.route, R.drawable.main_menu_icon_sunete, stringResource(id = R.string.main_menu_button_sounds)),
-        MainMenuModule(Screen.StoriesMenu.route, R.drawable.main_menu_icon_povesti, stringResource(id = R.string.main_menu_button_stories)),
+        MainMenuModule(GamesMenuRoute, R.drawable.main_menu_icon_jocuri, stringResource(id = R.string.main_menu_button_games)),
+        MainMenuModule(InstrumentsMenuRoute, R.drawable.main_menu_icon_instrumente, stringResource(id = R.string.main_menu_button_instruments)),
+        MainMenuModule(SongsMenuRoute, R.drawable.main_menu_icone_cantece, stringResource(id = R.string.main_menu_button_songs)),
+        MainMenuModule(SoundsMenuRoute, R.drawable.main_menu_icon_sunete, stringResource(id = R.string.main_menu_button_sounds)),
+        MainMenuModule(StoriesMenuRoute, R.drawable.main_menu_icon_povesti, stringResource(id = R.string.main_menu_button_stories)),
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -82,7 +84,7 @@ fun MainMenuScreen(
             }
 
             IconButton(
-                onClick = { navController.navigate(Screen.Paywall.route) },
+                onClick = { navController.navigate(PaywallRoute) },
                 modifier = Modifier.constrainAs(upgradeRef) {
                     top.linkTo(parent.top, margin = 16.dp)
                     end.linkTo(parent.end, margin = 16.dp)
@@ -96,7 +98,7 @@ fun MainMenuScreen(
                 )
             }
 
-            // Title (RED ZONE)
+            // Title Animation
             val infiniteTransition = rememberInfiniteTransition(label = "titleFloat")
             val titleOffsetY by infiniteTransition.animateFloat(
                 initialValue = -8f,
@@ -117,7 +119,7 @@ fun MainMenuScreen(
                         bottom.linkTo(menuRowRef.top)
                         start.linkTo(parent.start)
                         end.linkTo(parent.end)
-                        width = Dimension.percent(0.5f) // Title is smaller
+                        width = Dimension.percent(0.5f)
                     }
                     .aspectRatio(16f / 9f)
                     .graphicsLayer {
@@ -125,10 +127,10 @@ fun MainMenuScreen(
                     }
             )
 
-            // Menu Buttons (GREEN ZONE)
+            // Menu Buttons
             Row(
                 modifier = Modifier.constrainAs(menuRowRef) {
-                    bottom.linkTo(parent.bottom, margin = 24.dp) // Icons are lower
+                    bottom.linkTo(parent.bottom, margin = 24.dp)
                     start.linkTo(parent.start)
                     end.linkTo(parent.end)
                     width = Dimension.percent(0.95f)
@@ -147,7 +149,7 @@ fun MainMenuScreen(
 
             // Settings Button
             IconButton(
-                onClick = { navController.navigate(Screen.SettingsScreen.route) },
+                onClick = { navController.navigate(SettingsRoute) },
                 modifier = Modifier.constrainAs(settingsRef) {
                     bottom.linkTo(parent.bottom, margin = 16.dp)
                     end.linkTo(parent.end, margin = 16.dp)
@@ -162,7 +164,6 @@ fun MainMenuScreen(
             }
         }
 
-        // Snowfall effect on top of everything
         SnowfallEffect()
     }
 }
@@ -204,7 +205,7 @@ private fun ModuleButton(
             painter = painterResource(id = module.iconRes),
             contentDescription = module.title,
             modifier = Modifier
-                .size(108.dp) // Icons are bigger
+                .size(108.dp)
                 .graphicsLayer {
                     shadowElevation = animShadowElevation
                     if (animShadowElevation > 0) {
