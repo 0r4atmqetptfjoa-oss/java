@@ -116,11 +116,11 @@ fun AppNavigation(viewModel: MainViewModel) {
             }()
         }
 
-        // --- NOU (2026): MAGIC GARDEN ---
+        // --- MAGIC GARDEN ---
         composable(GameRoutes.MAGIC_GARDEN) {
             wrap(GameRoutes.MAGIC_GARDEN) {
+                // FIX: Am scos parametrul 'hasFullVersion' care nu există în definiția funcției
                 MagicGardenGameScreen(
-                    hasFullVersion = false, // FIX: Am adăugat parametrul lipsă
                     onBack = { backToGames(navController) }
                 )
             }()
@@ -137,11 +137,11 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable(GameRoutes.SEQUENCE) { wrap(GameRoutes.SEQUENCE) { SequenceMemoryGameScreen(navController, starState) }() }
         composable(GameRoutes.MATH) { wrap(GameRoutes.MATH) { MathGameScreen(navController, starState) }() }
 
-        // Asigură-te că aceste ecrane există sau comentează-le dacă nu sunt implementate încă
+        // Placeholder pentru ecrane
         composable(GameRoutes.BLOCKS) { wrap(GameRoutes.BLOCKS) { com.example.educationalapp.BlocksGameScreen(navController, starState) }() }
         composable(GameRoutes.MAZE) { wrap(GameRoutes.MAZE) { com.example.educationalapp.MazeGameScreen(navController, starState) }() }
 
-        // --- Shadow Match (upgradat 2026) ---
+        // --- Shadow Match ---
         composable(GameRoutes.SHADOW_MATCH) {
             wrap(GameRoutes.SHADOW_MATCH) {
                 ShadowMatchGameScreen(
