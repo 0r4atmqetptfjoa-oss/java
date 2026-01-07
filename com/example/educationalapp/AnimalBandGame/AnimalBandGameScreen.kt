@@ -2,8 +2,8 @@ package com.example.educationalapp.AnimalBandGame
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,8 +32,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -56,8 +56,9 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 /**
- * V2: animație din sprite sheet prin source-rect + crossfade între frame-uri,
- * și poziționare “pe scenă” (background) cu coordonate relative.
+ * V3 (Updated 2026): Optimizat pentru performanță (Memory Allocations).
+ * - Paint object reused (nu mai este creat la fiecare frame).
+ * - Menține stilul "Pixar" prin animații fluide.
  */
 @Composable
 fun AnimalBandGame(
@@ -144,7 +145,7 @@ fun AnimalBandGame(
         }
     }
 
-    // bounce global (aplicat doar pe sprite, nu și pe umbră). Am redus amplitudinea ca să nu "plutească".
+    // bounce global (aplicat doar pe sprite, nu și pe umbră).
     val bouncePx = (-sin(beatPhase * 2f * PI).toFloat() * (5f + viewModel.jam * 10f))
     val bounceDp = with(density) { bouncePx.toDp() }
 
@@ -192,12 +193,9 @@ fun AnimalBandGame(
                 val w = maxWidth
                 val h = maxHeight
 
-                // "linia de picioare" (aprox. suprafața scenei) – calibrată pentru bg_music_stage.
-                // Padding-ul transparent jos din sprite e compensat prin loaded.footYFrac.
+                // "linia de picioare"
                 val floorY = h * 0.63f
 
-                // Dimensiuni (pe înălțime) – mai mici decât v4 ca să încapă sub acoperiș.
-                // NOTĂ: clamp-urile nu mai forțează 200dp în landscape.
                 val bearH = (h * 0.40f).coerceIn(150.dp, 300.dp)
                 val sideH = (h * 0.36f).coerceIn(140.dp, 280.dp)
 
@@ -316,16 +314,12 @@ private fun StageMusician(
 
     val pulse = sin(beatPhase * 2f * PI).toFloat()
     val baseScale = if (enabled) 1f else 0.92f
-    // mic “squash & stretch” pe beat când cântă (arată mai viu)
     val lively = if (performing) (0.035f + jam * 0.06f) else 0f
     val scaleX = baseScale * (1f + lively * pulse)
     val scaleY = baseScale * (1f - lively * pulse)
 
-    // top-left dintr-un punct “center + feet”, compensând padding-ul transparent (loaded.footYFrac)
     val x = xCenter - (width / 2f)
     val y = feetY - (height * loaded.footYFrac)
-
-    // bounce mic în idle; bounce mai mare când cântă
     val localBounce = if (enabled && performing) bounce else (bounce * 0.18f)
 
     val showJudgement = judgement != null &&
@@ -345,7 +339,6 @@ private fun StageMusician(
                 onLongClick = onLongPress
             )
     ) {
-        // umbră ancorată la "picioare" (nu se mișcă cu bounce / scale)
         Canvas(Modifier.fillMaxSize()) {
             val shadowW = size.width * 0.52f
             val shadowH = size.height * 0.08f
@@ -359,7 +352,6 @@ private fun StageMusician(
             )
         }
 
-        // sprite + UI: bounce + scale cu pivot pe "picioare" (nu "plutește")
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -420,12 +412,19 @@ private fun SpriteSheetActor(
     val framePeriodSec = if (enabled && performing) spec.playFramePeriodSec else spec.idleFramePeriodSec
     val framePeriodNanos = (framePeriodSec * 1_000_000_000f).toLong().coerceAtLeast(1L)
 
-    // Fără crossfade (evită "ghosting"/dublare). Fluiditatea vine din framePeriod mai mic.
     val i = (songTimeNanos / framePeriodNanos).coerceAtLeast(0L)
     val idx = if (range.count <= 0) {
         range.start
     } else {
         range.start + ((i % range.count).toInt().coerceAtLeast(0))
+    }
+
+    // UPDATED: Create Paint once and reuse it.
+    // FilterQuality.High is crucial for the Pixar-style crispness on scaling.
+    val paint = remember {
+        Paint().apply {
+            filterQuality = FilterQuality.High
+        }
     }
 
     Canvas(modifier = modifier) {
@@ -437,13 +436,10 @@ private fun SpriteSheetActor(
             val dstOffset = IntOffset(0, 0)
             val dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt())
 
-            // Compat: folosim Canvas.drawImageRect(...) cu offset/size (disponibil în versiuni mai vechi Compose)
             drawIntoCanvas { canvas ->
-                val p = Paint().apply {
-                    this.alpha = alpha.coerceIn(0f, 1f)
-                    this.filterQuality = FilterQuality.High
-                }
-                canvas.drawImageRect(sheet, srcOffset, srcSize, dstOffset, dstSize, p)
+                // Actualizăm alpha doar dacă e necesar, fără a recrea obiectul Paint
+                paint.alpha = alpha.coerceIn(0f, 1f)
+                canvas.drawImageRect(sheet, srcOffset, srcSize, dstOffset, dstSize, paint)
             }
         }
 
