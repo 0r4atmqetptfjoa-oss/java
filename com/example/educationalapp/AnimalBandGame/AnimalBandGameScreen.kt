@@ -2,6 +2,7 @@ package com.example.educationalapp.AnimalBandGame
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi // Import necesar
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -282,6 +283,7 @@ fun AnimalBandGame(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class) // FIX: Rezolvă eroarea de experimental API
 @Composable
 private fun StageMusician(
     label: String,

@@ -44,22 +44,22 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
-// import com.example.educationalapp.alphabet.AlphabetSoundPlayer // COMENTAT: Sunete
+// import com.example.educationalapp.alphabet.AlphabetSoundPlayer
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.math.sin
 
 // ==============================================================================
-// RESURSE
+// RESURSE (FIX: Am scos 'const' pentru a rezolva eroarea de compilare)
 // ==============================================================================
-private const val BG_KITCHEN_RES: Int = R.drawable.bg_pizzeria_kitchen
-private const val PIZZA_DOUGH_RES: Int = R.drawable.pizza_1_dough_ball
-private const val PIZZA_FLAT_RES: Int = R.drawable.pizza_2_flat
-private const val PIZZA_SAUCE_RES: Int = R.drawable.pizza_3_sauced
-private const val TOOL_ROLLER_RES: Int = R.drawable.tool_rolling_pin
-private const val TOOL_LADLE_RES: Int = R.drawable.tool_sauce_ladle
-private const val OVEN_RES: Int = R.drawable.prop_oven_open
+private val BG_KITCHEN_RES: Int = R.drawable.bg_pizzeria_kitchen
+private val PIZZA_DOUGH_RES: Int = R.drawable.pizza_1_dough_ball
+private val PIZZA_FLAT_RES: Int = R.drawable.pizza_2_flat
+private val PIZZA_SAUCE_RES: Int = R.drawable.pizza_3_sauced
+private val TOOL_ROLLER_RES: Int = R.drawable.tool_rolling_pin
+private val TOOL_LADLE_RES: Int = R.drawable.tool_sauce_ladle
+private val OVEN_RES: Int = R.drawable.prop_oven_open
 
 @Composable
 fun CookingGameScreen(
@@ -69,14 +69,13 @@ fun CookingGameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     
-    // COMENTAT: Inițializare Player Sunete
     // val soundPlayer = remember { AlphabetSoundPlayer(context) } 
 
     var showConfetti by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isPizzaFinished) {
         if (uiState.isPizzaFinished) {
-            // soundPlayer.playCorrect() // COMENTAT: Sunet "Ta-da!"
+            // soundPlayer.playCorrect()
             showConfetti = true
         } else {
             showConfetti = false
@@ -85,7 +84,7 @@ fun CookingGameScreen(
 
     LaunchedEffect(uiState.stage) {
         if (uiState.stage != CookingStage.ROLLING) {
-             // soundPlayer.playClick() // COMENTAT: Sunet schimbare etapă
+             // soundPlayer.playClick()
         }
     }
 
@@ -162,7 +161,6 @@ fun CookingGameScreen(
                         pizzaRadiusPx = radius
                     },
                     onBite = { pos ->
-                        // soundPlayer.playClick()
                         viewModel.takeBite(pizzaRadiusPx, pos)
                     }
                 )
@@ -224,7 +222,6 @@ fun CookingGameScreen(
                             pizzaCenter = pizzaGlobalCenter,
                             pizzaRadius = pizzaRadiusPx,
                             onDrop = { id, pos ->
-                                // soundPlayer.playClick()
                                 viewModel.addTopping(id, pos)
                             },
                             onBake = { viewModel.startBaking() }
@@ -307,7 +304,6 @@ fun PizzaView(
             .pointerInput(stage) {
                 if (stage == CookingStage.EATING) {
                     detectTapGestures { offset ->
-                        // FIX: Adăugat 'f' pentru a asigura tipul Float
                         val center = Offset(size.width / 2f, size.height / 2f)
                         onBite(offset - center)
                     }
