@@ -42,10 +42,27 @@ fun AppNavigation(viewModel: MainViewModel) {
     val soundEnabled by viewModel.soundEnabled.collectAsState()
     val musicEnabled by viewModel.musicEnabled.collectAsState()
     val hardModeEnabled by viewModel.hardModeEnabled.collectAsState()
-    val starState = remember { mutableStateOf(starCount) }
+    val hasFullVersion by viewModel.hasFullVersion.collectAsState()
 
+    val starState = remember { mutableStateOf(starCount) }
+    // Creăm un MutableState pentru fullVersion pentru a-l pasa la PaywallScreen
+    val fullVersionState = remember { mutableStateOf(hasFullVersion) }
+
+    // Sincronizare starCount
     LaunchedEffect(starCount) { if (starState.value != starCount) starState.value = starCount }
     LaunchedEffect(starState.value) { viewModel.setStarCount(starState.value) }
+
+    // Sincronizare hasFullVersion (ViewModel -> UI și UI -> ViewModel)
+    LaunchedEffect(hasFullVersion) {
+        if (fullVersionState.value != hasFullVersion) {
+            fullVersionState.value = hasFullVersion
+        }
+    }
+    LaunchedEffect(fullVersionState.value) {
+        if (fullVersionState.value != hasFullVersion) {
+            viewModel.toggleFullVersion()
+        }
+    }
 
     NavHost(navController = navController, startDestination = MainMenuRoute) {
         composable<MainMenuRoute> { MainMenuScreen(navController = navController, starCount = starCount) }
@@ -62,7 +79,6 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable<PuzzleRoute> { PuzzleGameScreen(onBack = { backToGames(navController) }) }
         composable<CookingRoute> { CookingGameScreen(onBack = { backToGames(navController) }) }
         
-        // FIX: Acum MagicGarden accepta parametrul (sau il ignoram, ca are default)
         composable<MagicGardenRoute> { MagicGardenGameScreen(onBack = { backToGames(navController) }) }
 
         composable<MemoryRoute> { MemoryGameScreen(onHome = { backToGames(navController) }) }
@@ -94,6 +110,8 @@ fun AppNavigation(viewModel: MainViewModel) {
         composable<Song2Route> { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
         composable<Song3Route> { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
         composable<Song4Route> { backStackEntry -> SongPlayerScreen(navController, backStackEntry, starState) }
-        composable<PaywallRoute> { PaywallScreen(navController) }
+        
+        // FIX: Acum pasăm parametrul hasFullVersion corect
+        composable<PaywallRoute> { PaywallScreen(navController, fullVersionState) }
     }
 }
