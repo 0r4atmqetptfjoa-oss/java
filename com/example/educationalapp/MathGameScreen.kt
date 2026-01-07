@@ -1,10 +1,10 @@
 package com.example.educationalapp
 
+import android.view.animation.OvershootInterpolator // FIX: Adăugat importul lipsă
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -33,9 +32,7 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 // --- MAPPING RESURSE ---
-// Aceasta clasa face legatura intre logica si fisierele tale din drawable
 object MathAssets {
-    // Lista obiectelor de numarat
     val items = listOf(
         R.drawable.img_math_apple,
         R.drawable.img_math_banana,
@@ -47,7 +44,6 @@ object MathAssets {
         R.drawable.img_math_kitten
     )
 
-    // Mapping pentru numere (0-9)
     fun getNumberImage(number: Int): Int {
         return when (number) {
             0 -> R.drawable.img_number_0
@@ -60,14 +56,14 @@ object MathAssets {
             7 -> R.drawable.img_number_7
             8 -> R.drawable.img_number_8
             9 -> R.drawable.img_number_9
-            else -> R.drawable.img_number_0 // Fallback
+            else -> R.drawable.img_number_0
         }
     }
 }
 
 enum class MathGameMode {
-    COUNTING, // Doar numărat
-    ADDITION  // Adunări simple
+    COUNTING,
+    ADDITION
 }
 
 data class MathLevelData(
@@ -76,24 +72,19 @@ data class MathLevelData(
     val numberB: Int = 0,
     val correctAnswer: Int,
     val options: List<Int>,
-    val itemResId: Int // ID-ul resursei grafice (ex: R.drawable.img_math_apple)
+    val itemResId: Int
 )
 
 class MathGameLogic {
     fun generateLevel(levelIndex: Int): MathLevelData {
-        // Primele 5 nivele: Numărat. Următoarele 5: Adunări.
         val mode = if (levelIndex < 5) MathGameMode.COUNTING else MathGameMode.ADDITION
-        
-        // Alegem un obiect random din lista de asset-uri
         val itemRes = MathAssets.items.random()
 
         if (mode == MathGameMode.COUNTING) {
-            // Logică Numărat (1-9)
             val answer = Random.nextInt(1, 10)
             val options = generateOptions(answer)
             return MathLevelData(mode, answer, 0, answer, options, itemRes)
         } else {
-            // Logică Adunare (Sume până la 9 pentru a folosi imaginile 0-9)
             val a = Random.nextInt(1, 5)
             val b = Random.nextInt(1, 5)
             val answer = a + b
@@ -114,13 +105,14 @@ class MathGameLogic {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class) // FIX: Adnotare necesară pentru FlowRow
 @Composable
 fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
     val gameLogic = remember { MathGameLogic() }
     
     var currentLevelIndex by remember { mutableStateOf(0) }
     var score by remember { mutableStateOf(0) }
-    // Generăm primul nivel. Asigura-te ca ai resursele in drawable sau va da eroare la runtime!
+    // Asigură-te că ai resursele (imagini) adăugate în folderul res/drawable
     var levelData by remember { mutableStateOf(gameLogic.generateLevel(0)) }
     
     var isGameOver by remember { mutableStateOf(false) }
@@ -149,12 +141,11 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                 }
             }
         } else {
-            // Feedback eroare (poți adăuga un shake animation aici)
+            // Feedback eroare opțional
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. FUNDALUL (Imagine completă)
         Image(
             painter = painterResource(id = R.drawable.bg_game_math),
             contentDescription = null,
@@ -163,9 +154,8 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
         )
 
         if (showConfetti) {
-            // Imagine confetti peste tot ecranul (sau particule)
             Image(
-                painter = painterResource(id = R.drawable.img_confetti), // Asigura-te ca ai img_confetti.png
+                painter = painterResource(id = R.drawable.img_confetti),
                 contentDescription = null,
                 contentScale = ContentScale.FillWidth,
                 modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)
@@ -191,7 +181,6 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                     .systemBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 GameHeader(
                     progress = (currentLevelIndex + 1) / 10f,
                     score = score,
@@ -200,10 +189,10 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Zona de Joc
                 AnimatedVisibility(
                     visibleState = transitionState,
-                    enter = scaleIn(animationSpec = tween(400, easing = OvershootInterpolator(1.2f))) + fadeIn(),
+                    // FIX: Am corectat sintaxa pentru OvershootInterpolator
+                    enter = scaleIn(animationSpec = tween(400, easing = { OvershootInterpolator(1.2f).getInterpolation(it) })) + fadeIn(),
                     exit = scaleOut() + fadeOut()
                 ) {
                     MathQuestionCard(levelData = levelData)
@@ -211,7 +200,6 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // Zona Răspunsuri (Butoane cu Imagini)
                 AnswerOptionsRow(
                     options = levelData.options,
                     onOptionSelected = { handleAnswer(it) }
@@ -265,7 +253,6 @@ fun GameHeader(progress: Float, score: Int, onBack: () -> Unit) {
                 .padding(horizontal = 12.dp, vertical = 6.dp)
                 .shadow(2.dp, RoundedCornerShape(16.dp))
         ) {
-            // Folosim imaginea stelei (ic_score_star)
             Image(
                 painter = painterResource(id = R.drawable.ic_score_star),
                 contentDescription = null,
@@ -281,6 +268,7 @@ fun GameHeader(progress: Float, score: Int, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class) // FIX: Adnotare pentru FlowRow
 @Composable
 fun MathQuestionCard(levelData: MathLevelData) {
     Card(
@@ -355,8 +343,6 @@ fun GameGroupImages(count: Int, resId: Int) {
              modifier = Modifier.width(if(count > 1) 100.dp else 60.dp), 
              horizontalArrangement = Arrangement.Center
          ) {
-             // Limităm vizual la 2-3 iconițe ca să nu aglomerăm, 
-             // sau le afișăm pe toate dacă sunt mici
              val displayCount = if (count > 3) 3 else count
              repeat(displayCount) {
                  Image(
@@ -417,12 +403,12 @@ fun ImageButton(number: Int, onClick: () -> Unit) {
             .shadow(8.dp, CircleShape),
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-        contentPadding = PaddingValues(0.dp) // Important pentru ca imaginea să fie mare
+        contentPadding = PaddingValues(0.dp)
     ) {
         Image(
             painter = painterResource(id = imageRes),
             contentDescription = "Number $number",
-            modifier = Modifier.fillMaxSize().padding(10.dp), // Padding mic interior
+            modifier = Modifier.fillMaxSize().padding(10.dp),
             contentScale = ContentScale.Fit
         )
     }
