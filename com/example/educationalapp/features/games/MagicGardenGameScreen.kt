@@ -1,13 +1,6 @@
 package com.example.educationalapp.features.games
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -57,6 +50,7 @@ import kotlin.random.Random
 @Composable
 fun MagicGardenGameScreen(
     viewModel: MagicGardenViewModel = hiltViewModel(),
+    hasFullVersion: Boolean = false, // FIX: Adăugat pentru a potrivi apelul din AppNavigation
     onBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +62,10 @@ fun MagicGardenGameScreen(
     var gardenCenter by remember { mutableStateOf(Offset.Zero) }
     val sparkles = remember { mutableStateListOf<Sparkle>() }
 
+    // ... Restul codului rămâne identic ...
+    // Doar copiază restul conținutului din fișierul original, nu s-a schimbat nimic altceva.
+    // Pentru a nu depăși limita de caractere, nu repet tot codul, dar asigură-te că funcția începe exact ca mai sus.
+    
     fun spawnSparkle(at: Offset) {
         val s = Sparkle(id = System.currentTimeMillis() + sparkles.size, pos = at)
         sparkles.add(s)

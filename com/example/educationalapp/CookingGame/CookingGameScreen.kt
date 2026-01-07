@@ -44,15 +44,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.educationalapp.R
-// import com.example.educationalapp.alphabet.AlphabetSoundPlayer
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.math.sin
 
-// ==============================================================================
-// RESURSE (FIX: Am scos 'const' pentru a rezolva eroarea de compilare)
-// ==============================================================================
+// FIX: Folosim 'val' simplu, nu 'const val', deoarece R.drawable.* nu sunt constante de compilare pure în Kotlin
 private val BG_KITCHEN_RES: Int = R.drawable.bg_pizzeria_kitchen
 private val PIZZA_DOUGH_RES: Int = R.drawable.pizza_1_dough_ball
 private val PIZZA_FLAT_RES: Int = R.drawable.pizza_2_flat
@@ -69,22 +66,13 @@ fun CookingGameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     
-    // val soundPlayer = remember { AlphabetSoundPlayer(context) } 
-
     var showConfetti by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isPizzaFinished) {
         if (uiState.isPizzaFinished) {
-            // soundPlayer.playCorrect()
             showConfetti = true
         } else {
             showConfetti = false
-        }
-    }
-
-    LaunchedEffect(uiState.stage) {
-        if (uiState.stage != CookingStage.ROLLING) {
-             // soundPlayer.playClick()
         }
     }
 
@@ -127,7 +115,6 @@ fun CookingGameScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. FUNDAL
         Image(
             painter = painterResource(id = BG_KITCHEN_RES),
             contentDescription = null,
@@ -141,7 +128,6 @@ fun CookingGameScreen(
                 .background(Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(0.5f))))
         )
 
-        // 2. LAYOUT PRINCIPAL
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -167,7 +153,6 @@ fun CookingGameScreen(
             }
         }
         
-        // 3. LAYER PARTICULE
         Canvas(modifier = Modifier.fillMaxSize()) {
             particles.forEach { p ->
                 drawCircle(
@@ -178,7 +163,6 @@ fun CookingGameScreen(
             }
         }
 
-        // 4. UI CONTROLS
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -247,7 +231,6 @@ fun CookingGameScreen(
             }
         }
 
-        // 5. HEADER
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -269,9 +252,10 @@ fun CookingGameScreen(
     }
 }
 
-// ==============================================================================
-// 🍕 COMPONENTE PIZZA
-// ==============================================================================
+// ... Restul componentelor PizzaView, ControlPanel, etc. rămân neschimbate ...
+// Asigură-te că păstrezi tot codul de mai jos din fișierul original, l-am lăsat neatins aici pentru a nu aglomera.
+// Dă copy-paste doar la partea de sus dacă ai deja restul, sau copiază tot fișierul din răspunsul anterior dacă vrei siguranță.
+// Pentru siguranță, voi re-include helper-ele esențiale mai jos:
 
 @Composable
 fun PizzaView(
@@ -377,10 +361,6 @@ fun ToppingItem(topping: PlacedTopping) {
             .scale(animatedScale.value)
     )
 }
-
-// ==============================================================================
-// 🎮 CONTROLS & DRAG LOGIC
-// ==============================================================================
 
 @Composable
 fun ControlPanel(
@@ -538,10 +518,6 @@ fun DraggableIngredient(
         }
     }
 }
-
-// ==============================================================================
-// 🛠️ UTILS & FX
-// ==============================================================================
 
 @Composable
 fun BakingOvenView(progress: Float, ovenRes: Int) {
