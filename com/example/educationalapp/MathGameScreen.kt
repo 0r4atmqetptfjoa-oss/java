@@ -5,7 +5,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border // FIX: Import adăugat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -26,7 +25,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -34,14 +32,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex // FIX: Import adăugat
+import androidx.compose.ui.zIndex
 import androidx.navigation.NavController
 import com.example.educationalapp.navigation.MainMenuRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
-// --- CONFIGURARE RESURSE ---
+// --- MAPPING RESURSE ---
 object MathAssets {
     val items = listOf(
         R.drawable.img_math_apple,
@@ -197,11 +195,11 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                 modifier = Modifier
                     .fillMaxSize()
                     .systemBarsPadding()
-                    .padding(12.dp)
+                    .padding(16.dp)
             ) {
                 val maxHeight = maxHeight
                 
-                // FIX: zIndex acum va funcționa corect datorită importului
+                // HEADER (SCOR & HOME)
                 GameHeaderFloating(
                     score = score,
                     onBack = { showExitDialog = true },
@@ -209,12 +207,13 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                 )
 
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(top = 60.dp),
+                    modifier = Modifier.fillMaxSize().padding(top = 50.dp), // Loc pentru header
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // ZONA OBIECTE (STÂNGA - 70%)
                     Box(
                         modifier = Modifier
-                            .weight(0.75f)
+                            .weight(0.70f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
@@ -227,9 +226,10 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                         }
                     }
 
+                    // ZONA RĂSPUNSURI (DREAPTA - 30%)
                     Box(
                         modifier = Modifier
-                            .weight(0.25f)
+                            .weight(0.30f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.CenterEnd
                     ) {
@@ -244,8 +244,6 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
     }
 }
 
-// --- UI COMPONENTS ---
-
 @Composable
 fun GameHeaderFloating(score: Int, onBack: () -> Unit, modifier: Modifier = Modifier) {
     Row(
@@ -253,49 +251,47 @@ fun GameHeaderFloating(score: Int, onBack: () -> Unit, modifier: Modifier = Modi
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top
     ) {
+        // Buton Home FĂRĂ CHENAR (Doar iconiță albă strălucitoare)
         IconButton(
             onClick = onBack,
             modifier = Modifier
                 .size(64.dp)
-                .background(Color.White.copy(alpha=0.2f), CircleShape)
-                .border(2.dp, Color.White.copy(alpha=0.5f), CircleShape) // FIX: border acum funcționează
+                .background(Color.White.copy(alpha=0.15f), CircleShape) // Aproape invizibil
         ) {
             Icon(
                 Icons.Default.Home, 
                 contentDescription = "Home", 
                 tint = Color.White,
-                modifier = Modifier.size(40.dp).shadow(4.dp)
+                modifier = Modifier.size(42.dp).shadow(4.dp)
             )
         }
 
+        // ZONA SCOR REPARATĂ
         Box(
             contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier
-                .size(90.dp)
-                .background(Brush.radialGradient(listOf(Color(0xFFFFD700).copy(alpha=0.6f), Color.Transparent)))
-            )
-            
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Steaua MULT MAI MARE
                 Image(
                     painter = painterResource(id = R.drawable.ic_score_star),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(70.dp)
+                        .size(85.dp) // GIGANT
                         .graphicsLayer { 
-                            shadowElevation = 20f 
-                            scaleX = 1.1f
-                            scaleY = 1.1f
+                            shadowElevation = 25f 
                         }
                 )
+                
+                // Textul Scorului MAI MIC
                 Text(
                     text = "$score",
                     style = TextStyle(
-                        fontSize = 48.sp,
+                        fontSize = 32.sp, // Mult mai mic, ca să nu concureze cu obiectele
                         fontWeight = FontWeight.Black,
                         color = Color.White,
-                        shadow = Shadow(color = Color(0xFFFF6F00), offset = Offset(4f, 4f), blurRadius = 8f)
-                    )
+                        shadow = Shadow(color = Color(0xFFFF6F00), offset = Offset(3f, 3f), blurRadius = 6f)
+                    ),
+                    modifier = Modifier.padding(start = 2.dp)
                 )
             }
         }
@@ -311,12 +307,14 @@ fun MathQuestionAreaMaximized(levelData: MathLevelData, availableHeight: Dp) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (levelData.mode == MathGameMode.COUNTING) {
-            OutlinedTextBig(text = "Câte vezi?")
+            // Text MICȘORAT (32sp)
+            OutlinedTextBig(text = "Câte vezi?", fontSize = 32.sp)
             
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
-            val contentHeight = availableHeight - 100.dp 
+            val contentHeight = availableHeight - 80.dp 
             
+            // Obiecte GIGANT
             val itemSize = when (levelData.numberA) {
                 1 -> contentHeight * 0.85f 
                 2 -> contentHeight * 0.55f 
@@ -335,8 +333,8 @@ fun MathQuestionAreaMaximized(levelData: MathLevelData, availableHeight: Dp) {
             }
 
         } else {
-            OutlinedTextBig(text = "Adună-le!")
-            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedTextBig(text = "Adună-le!", fontSize = 32.sp)
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -347,7 +345,7 @@ fun MathQuestionAreaMaximized(levelData: MathLevelData, availableHeight: Dp) {
                 Text(
                     " + ",
                     style = TextStyle(
-                        fontSize = 80.sp,
+                        fontSize = 60.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
                         shadow = Shadow(color = Color.Black.copy(alpha=0.5f), offset = Offset(4f, 4f), blurRadius = 8f)
@@ -362,24 +360,24 @@ fun MathQuestionAreaMaximized(levelData: MathLevelData, availableHeight: Dp) {
 }
 
 @Composable
-fun OutlinedTextBig(text: String) {
+fun OutlinedTextBig(text: String, fontSize: androidx.compose.ui.unit.TextUnit) {
     Box(contentAlignment = Alignment.Center) {
         Text(
             text = text,
             style = TextStyle(
-                fontSize = 52.sp,
+                fontSize = fontSize,
                 fontWeight = FontWeight.Black,
                 color = Color.Black.copy(alpha=0.8f)
             ),
-            modifier = Modifier.offset(3.dp, 3.dp)
+            modifier = Modifier.offset(2.dp, 2.dp)
         )
         Text(
             text = text,
             style = TextStyle(
-                fontSize = 52.sp,
+                fontSize = fontSize,
                 fontWeight = FontWeight.Black,
                 color = Color.White,
-                shadow = Shadow(color = Color(0xFF2196F3), blurRadius = 15f)
+                shadow = Shadow(color = Color(0xFF2196F3), blurRadius = 10f)
             )
         )
     }
@@ -396,7 +394,7 @@ fun GameGroupImages(count: Int, resId: Int) {
                 painter = painterResource(id = resId),
                 contentDescription = null,
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(100.dp) // Mari
                     .shadow(8.dp, CircleShape, spotColor = Color.Black.copy(alpha=0.4f))
             )
         }
@@ -408,7 +406,7 @@ fun BouncingImageItem(resId: Int, delay: Int, size: Dp) {
     val infiniteTransition = rememberInfiniteTransition(label = "bounce")
     val scale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.08f,
+        targetValue = 1.05f, // Pulsare fină
         animationSpec = infiniteRepeatable(
             animation = tween(1500, delayMillis = delay, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -431,26 +429,29 @@ fun BouncingImageItem(resId: Int, delay: Int, size: Dp) {
 @Composable
 fun AnswerOptionsColumn(options: List<Int>, onOptionSelected: (Int) -> Unit) {
     Column(
-        modifier = Modifier.fillMaxHeight().padding(end = 16.dp),
+        modifier = Modifier.fillMaxHeight().padding(end = 8.dp),
         verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.End
     ) {
         options.forEach { number ->
             val imageRes = MathAssets.getNumberImage(number)
+            
+            // BUTOANE STRICT UNIFORME
             Button(
                 onClick = { onOptionSelected(number) },
                 modifier = Modifier
-                    .size(110.dp)
+                    .size(100.dp) // DIMENSIUNE FIXĂ ȘI UNIFORMĂ
                     .shadow(12.dp, CircleShape, spotColor = Color.Black.copy(alpha=0.4f)),
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                contentPadding = PaddingValues(0.dp)
+                contentPadding = PaddingValues(0.dp) 
             ) {
+                // Imaginea se scalează perfect în interior
                 Image(
                     painter = painterResource(id = imageRes),
                     contentDescription = "Number $number",
                     modifier = Modifier.fillMaxSize().padding(12.dp),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit 
                 )
             }
         }
