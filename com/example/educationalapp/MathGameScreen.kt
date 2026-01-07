@@ -5,7 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,9 +25,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.example.educationalapp.navigation.MainMenuRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
@@ -82,12 +84,14 @@ class MathGameLogic {
         val itemRes = MathAssets.items.random()
 
         if (mode == MathGameMode.COUNTING) {
-            val answer = Random.nextInt(1, 10)
+            // Maxim 6 obiecte pentru a încăpea perfect pe ecran
+            val answer = Random.nextInt(1, 7)
             val options = generateOptions(answer)
             return MathLevelData(mode, answer, 0, answer, options, itemRes)
         } else {
-            val a = Random.nextInt(1, 5)
-            val b = Random.nextInt(1, 5)
+            // Sume mici (max 4+4)
+            val a = Random.nextInt(1, 4)
+            val b = Random.nextInt(1, 4)
             val answer = a + b
             val options = generateOptions(answer)
             return MathLevelData(mode, a, b, answer, options, itemRes)
@@ -113,18 +117,16 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
     
     var currentLevelIndex by remember { mutableStateOf(0) }
     var score by remember { mutableStateOf(0) }
+    // Asigură-te că imaginile există în drawable, altfel aplicația se va închide
     var levelData by remember { mutableStateOf(gameLogic.generateLevel(0)) }
     
     var isGameOver by remember { mutableStateOf(false) }
     var showConfetti by remember { mutableStateOf(false) }
+    var showExitDialog by remember { mutableStateOf(false) }
     
-    // FIX: Folosim un boolean simplu în loc de MutableTransitionState pentru a evita erorile
     var isContentVisible by remember { mutableStateOf(false) }
-    
-    // Inițializăm interpolatorul o singură dată
     val overshootInterpolator = remember { OvershootInterpolator(1.2f) }
 
-    // Activăm animația de intrare la prima randare
     LaunchedEffect(Unit) {
         isContentVisible = true
     }
@@ -141,21 +143,15 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                 delay(1500)
                 showConfetti = false
                 if (currentLevelIndex < 9) {
-                    // Start animație ieșire
                     isContentVisible = false
-                    delay(400) // Așteptăm să se termine animația
-                    
+                    delay(400)
                     currentLevelIndex++
                     levelData = gameLogic.generateLevel(currentLevelIndex)
-                    
-                    // Start animație intrare
                     isContentVisible = true
                 } else {
                     isGameOver = true
                 }
             }
-        } else {
-            // Aici poți adăuga feedback vizual pentru eroare (ex: shake)
         }
     }
 
@@ -177,6 +173,38 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
             )
         }
 
+        // --- DIALOG CONFIRMARE IEȘIRE ---
+        if (showExitDialog) {
+             AlertDialog(
+                onDismissRequest = { showExitDialog = false },
+                title = { Text("Pauză", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold) },
+                text = { Text("Vrei să ieși la meniul principal?", fontSize = 18.sp) },
+                confirmButton = {
+                    Button(
+                        onClick = { 
+                            // Navigare sigură către meniu
+                            navController.navigate(MainMenuRoute) {
+                                popUpTo(MainMenuRoute) { inclusive = true }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800))
+                    ) {
+                        Text("Da, Ies")
+                    }
+                },
+                dismissButton = {
+                    Button(
+                        onClick = { showExitDialog = false },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("Nu, Joc")
+                    }
+                },
+                containerColor = Color.White,
+                shape = RoundedCornerShape(24.dp)
+            )
+        }
+
         if (isGameOver) {
             MathGameOverDialog(
                 score = score,
@@ -187,39 +215,37 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                     levelData = gameLogic.generateLevel(0)
                     isContentVisible = true
                 },
-                onHome = { navController.navigate(Screen.MainMenu.route) }
+                onHome = { navController.navigate(MainMenuRoute) }
             )
         } else {
-            // LAYOUT PRINCIPAL (LANDSCAPE OPTIMIZED)
+            // LAYOUT PRINCIPAL (LANDSCAPE)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp)
                     .systemBarsPadding()
             ) {
-                // 1. HEADER (Sus)
+                // HEADER
                 GameHeader(
                     progress = (currentLevelIndex + 1) / 10f,
                     score = score,
-                    onBack = { navController.navigate(Screen.MainMenu.route) }
+                    onBack = { showExitDialog = true }
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // 2. CONȚINUTUL (Split Stânga - Dreapta)
+                // CONTENT AREA
                 Row(
                     modifier = Modifier.fillMaxSize(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // PARTEA STÂNGĂ: Întrebarea (Card Mare)
+                    // PARTEA STÂNGĂ: Întrebarea
                     Box(
                         modifier = Modifier
                             .weight(0.65f)
                             .fillMaxHeight()
                             .padding(end = 16.dp)
                     ) {
-                        // FIX: Apelăm explicit androidx.compose.animation.AnimatedVisibility
-                        // pentru a evita confuzia cu RowScope.AnimatedVisibility
                         androidx.compose.animation.AnimatedVisibility(
                             visible = isContentVisible,
                             enter = scaleIn(animationSpec = tween(400, easing = { overshootInterpolator.getInterpolation(it) })) + fadeIn(),
@@ -230,14 +256,13 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
                         }
                     }
 
-                    // PARTEA DREAPTĂ: Răspunsurile (Coloană verticală)
+                    // PARTEA DREAPTĂ: Răspunsurile
                     Box(
                         modifier = Modifier
                             .weight(0.35f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Răspunsurile sunt mereu vizibile, sau poți să le animezi și pe ele
                         AnswerOptionsColumn(
                             options = levelData.options,
                             onOptionSelected = { handleAnswer(it) }
@@ -249,7 +274,7 @@ fun MathGameScreen(navController: NavController, starState: MutableState<Int>) {
     }
 }
 
-// --- UI COMPONENTS ---
+// --- UI COMPONENTS OPTIMIZATE ---
 
 @Composable
 fun GameHeader(progress: Float, score: Int, onBack: () -> Unit) {
@@ -258,21 +283,29 @@ fun GameHeader(progress: Float, score: Int, onBack: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        IconButton(
+        // HOME BUTTON
+        Button(
             onClick = onBack,
-            modifier = Modifier
-                .size(42.dp)
-                .background(Color.White, CircleShape)
-                .shadow(4.dp, CircleShape)
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(56.dp)
         ) {
-            Icon(Icons.Default.Home, contentDescription = "Home", tint = Color(0xFFFF9800))
+            Icon(
+                Icons.Default.Home, 
+                contentDescription = "Home", 
+                tint = Color(0xFFFF9800),
+                modifier = Modifier.size(32.dp)
+            )
         }
 
+        // PROGRES BAR
         Box(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 24.dp)
-                .height(14.dp)
+                .height(18.dp)
                 .clip(RoundedCornerShape(50))
                 .background(Color.White.copy(alpha = 0.5f))
         ) {
@@ -284,24 +317,30 @@ fun GameHeader(progress: Float, score: Int, onBack: () -> Unit) {
             )
         }
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // SCOR FOARTE VIZIBIL
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier
-                .background(Color.White, RoundedCornerShape(16.dp))
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .shadow(2.dp, RoundedCornerShape(16.dp))
+                .background(Color.White, CircleShape)
+                .border(3.dp, Color(0xFFFFD700), CircleShape)
+                .shadow(6.dp, CircleShape)
+                .padding(10.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_score_star),
-                contentDescription = null,
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = "$score",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = Color(0xFF37474F)
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_score_star),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(58.dp) // Stea mare
+                        .shadow(4.dp, CircleShape, spotColor = Color(0xFFFFD700))
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "$score",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Black, fontSize = 28.sp),
+                    color = Color(0xFF37474F)
+                )
+            }
         }
     }
 }
@@ -329,27 +368,36 @@ fun MathQuestionCard(levelData: MathLevelData) {
                     color = Color(0xFF2196F3),
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 
+                // --- LOGICĂ DIMENSIUNE ---
+                // Ajustat pentru a încăpea pe ecrane landscape (unde înălțimea e limitată)
+                val dynamicItemSize = when (levelData.numberA) {
+                    1 -> 150.dp // Foarte mare (Single)
+                    2, 3 -> 110.dp // Mari (Un singur rând)
+                    else -> 85.dp  // Medii (Două rânduri - ca să nu iasă din ecran)
+                }
+
                 FlowRow(
-                    modifier = Modifier.padding(8.dp),
+                    modifier = Modifier.padding(4.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalArrangement = Arrangement.Center,
-                    maxItemsInEachRow = 4
+                    maxItemsInEachRow = 3 // Forțăm maxim 3 pe rând
                 ) {
                     repeat(levelData.numberA) {
-                        BouncingImageItem(resId = levelData.itemResId, delay = it * 100)
+                        BouncingImageItem(resId = levelData.itemResId, delay = it * 100, size = dynamicItemSize)
                     }
                 }
 
             } else {
+                // Modul Adunare
                 Text(
                     "Adună-le!",
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color(0xFFFF9800),
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -382,27 +430,24 @@ fun GameGroupImages(count: Int, resId: Int) {
              horizontalArrangement = Arrangement.Center,
              verticalAlignment = Alignment.CenterVertically
          ) {
-             val displayCount = if (count > 3) 3 else count
-             repeat(displayCount) {
+             // La adunare folosim o dimensiune puțin mai mică pentru a încăpea grupurile
+             repeat(count) {
                  Image(
                      painter = painterResource(id = resId),
                      contentDescription = null,
-                     modifier = Modifier.size(36.dp)
+                     modifier = Modifier.size(65.dp) 
                  )
-             }
-             if (count > 3) {
-                 Text("+", fontSize = 20.sp, modifier = Modifier.padding(start = 4.dp))
              }
          }
     }
 }
 
 @Composable
-fun BouncingImageItem(resId: Int, delay: Int) {
+fun BouncingImageItem(resId: Int, delay: Int, size: Dp) {
     val infiniteTransition = rememberInfiniteTransition(label = "bounce")
     val dy by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = -8f,
+        targetValue = -12f,
         animationSpec = infiniteRepeatable(
             animation = tween(1000, delayMillis = delay, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
@@ -413,7 +458,7 @@ fun BouncingImageItem(resId: Int, delay: Int) {
         painter = painterResource(id = resId),
         contentDescription = null,
         modifier = Modifier
-            .size(56.dp)
+            .size(size) // Folosim mărimea calculată
             .padding(4.dp)
             .graphicsLayer { translationY = dy }
     )
@@ -439,8 +484,8 @@ fun ImageButton(number: Int, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         modifier = Modifier
-            .size(80.dp)
-            .shadow(6.dp, CircleShape),
+            .size(85.dp) // Dimensiune sigură pentru butoane
+            .shadow(8.dp, CircleShape),
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(containerColor = Color.White),
         contentPadding = PaddingValues(0.dp)
@@ -448,7 +493,7 @@ fun ImageButton(number: Int, onClick: () -> Unit) {
         Image(
             painter = painterResource(id = imageRes),
             contentDescription = "Number $number",
-            modifier = Modifier.fillMaxSize().padding(8.dp),
+            modifier = Modifier.fillMaxSize().padding(10.dp),
             contentScale = ContentScale.Fit
         )
     }
@@ -468,32 +513,40 @@ fun MathGameOverDialog(score: Int, onRestart: () -> Unit, onHome: () -> Unit) {
         },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Ai adunat $score puncte!", fontSize = 18.sp)
+                Text("Ai adunat $score puncte!", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 Row {
                     repeat(3) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_score_star),
                             contentDescription = null,
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(56.dp)
                         )
                     }
                 }
             }
         },
         confirmButton = {
-            Button(onClick = onRestart, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))) {
+            Button(
+                onClick = onRestart, 
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
                 Icon(Icons.Default.Refresh, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Joacă din nou")
+                Text("Joacă din nou", fontSize = 18.sp)
             }
         },
         dismissButton = {
-            Button(onClick = onHome, colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)) {
-                Text("Meniu")
+            Button(
+                onClick = onHome, 
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Gray),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+            ) {
+                Text("Meniu Principal", fontSize = 18.sp)
             }
         },
         containerColor = Color.White,
-        shape = RoundedCornerShape(24.dp)
+        shape = RoundedCornerShape(32.dp)
     )
 }
